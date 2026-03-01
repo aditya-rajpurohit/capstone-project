@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env
+.env.*
+
+# Pytest
+.pytest_cache/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+
+# Docker compose
+docker-compose.yaml
+
+# Local database volume
+postgres_data/
+
+# Logs
+*.log

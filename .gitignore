@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+.env
+.env.*
+
+# Pytest
+.pytest_cache/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+
+# Docker
+postgres_data/
+
+# Optional: logs
+*.log
