@@ -1,12 +1,13 @@
 import pytest
+import os
 from app.tools.db_connector.postgres_connector import PostgresConnector
 from app.orchestration.execution_controller import ExecutionController
 
-TEST_DSN = "postgresql://adityarajpurohit:postgres@localhost:5432/test_agentic_db"
+TEST_DSN = os.getenv("TEST_DSN")
 
 @pytest.mark.asyncio
 async def test_full_workflow():
-    connector = PostgresConnector(TEST_DSN)
+    connector = PostgresConnector(str(TEST_DSN))
     await connector.connect()
 
     # test schema
