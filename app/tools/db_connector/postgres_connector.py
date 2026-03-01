@@ -15,19 +15,16 @@ class PostgresConnector(BaseConnector):
         self.dialect = DatabaseDialect.POSTGRES
 
     async def connect(self) -> None:
-        """TODO"""
         if not self._pool:
             self._pool = await asyncpg.create_pool(dsn=self._dsn)
 
     async def close(self) -> None:
-        """TODO"""
         if self._pool:
             await self._pool.close()
 
         self._pool = None
 
     async def execute(self, sql: str) -> list[dict[str, Any]]:
-        """TODO"""
         if not self._pool:
             raise RuntimeError("Error: PostgresConnector not connected!")
 
@@ -36,7 +33,6 @@ class PostgresConnector(BaseConnector):
             return [dict(row) for row in rows]
 
     async def introspect_schema(self) -> list[dict[str, Any]]:
-        """TODO"""
         if not self._pool:
             raise RuntimeError("Error: PostgresConnector not connected!")
 
