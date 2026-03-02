@@ -1,11 +1,8 @@
 from typing import Any
-from app.schemas.schema_context_schema import (
-    SchemaContext,
-    TableInfo,
-    ColumnInfo,
-    ForeignKeyInfo,
-)
+
 from app.core.constants import DatabaseDialect
+from app.schemas.schema_context_schema import (ColumnInfo, ForeignKeyInfo,
+                                               SchemaContext, TableInfo)
 
 
 class SchemaTransformer:

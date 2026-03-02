@@ -1,8 +1,9 @@
 import os
+
 from openai import AsyncOpenAI
+
 from app.inference.base import Model
 from app.inference.types import ModelRequest, ModelResponse
-
 
 _KEY = os.getenv("OPENAI_API_KEY")
 
@@ -26,7 +27,7 @@ class OpenAI(Model):
             ],
             response_format={"type": "json_object"},
         )
-        
+
         if not response.choices[0].message.content:
             raise ValueError("OpenAI response error!")
 
@@ -35,4 +36,3 @@ class OpenAI(Model):
             provider="openai",
             model=request.model,
         )
-    

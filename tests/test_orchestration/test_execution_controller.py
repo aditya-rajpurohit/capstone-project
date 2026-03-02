@@ -1,26 +1,29 @@
-import pytest
 import os
-from app.inference.models.anthropic import Anthropic
-from app.inference.structured import StructuredModel
-from app.tools.db_connector.postgres_connector import PostgresConnector
-from app.orchestration.execution_controller import ExecutionController
+
+import pytest
+
 from app.agents.planner_agent import PlannerAgent
 from app.agents.query_agent import QueryAgent
+from app.agents.reflection_agent import ReflectionAgent
+from app.inference.models.anthropic import Anthropic
+from app.inference.structured import StructuredModel
+from app.orchestration.execution_controller import ExecutionController
+from app.tools.db_connector.postgres_connector import PostgresConnector
 
 TEST_DSN = os.getenv("TEST_DSN")
 TEST_KEY = os.getenv("ANTHROPIC_API_KEY")
+
 
 @pytest.mark.asyncio
 async def test_full_workflow():
     if not TEST_DSN:
         pytest.skip("DSN not set!")
-    
+
     if not TEST_KEY:
         pytest.skip("API_KEY not set!")
 
     connector = PostgresConnector(str(TEST_DSN))
     await connector.connect()
-
 
     # ----------------------
     # 1️⃣ Setup Test Schema
@@ -45,7 +48,6 @@ async def test_full_workflow():
             ('Charlie', 35);
     """)
 
-
     # ----------------------
     # 2️⃣ Setup Agents
     # ----------------------
@@ -55,8 +57,14 @@ async def test_full_workflow():
 
     planner = PlannerAgent(structured_model, "claude-3-haiku-20240307")
     query = QueryAgent(structured_model, "claude-3-haiku-20240307")
+    reflection = ReflectionAgent()
 
-    controller = ExecutionController(connector=connector, planner_agent=planner, query_agent=query)
+    controller = ExecutionController(
+        connector=connector,
+        planner_agent=planner,
+        query_agent=query,
+        reflection_agent=reflection,
+    )
 
     # ----------------------
     # 3️⃣ Run NL Query
@@ -71,8 +79,7 @@ async def test_full_workflow():
     assert trace.execution_result["status"] == "success"
 
     rows = trace.execution_result["rows"]
-    
-    
+
     # ----------------------
     # 4️⃣ Validate Output
     # ----------------------
@@ -86,7 +93,6 @@ async def test_full_workflow():
     result_names = [{"name": row["name"]} for row in rows]
 
     assert result_names == expected
-
 
     # ----------------------
     # 5️⃣ Cleanup

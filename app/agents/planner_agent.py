@@ -1,8 +1,7 @@
 from app.agents.base_agent import BaseAgent
-from app.schemas.planner_schema import PlannerOutput
 from app.inference.structured import StructuredModel
 from app.inference.types import ModelRequest
-
+from app.schemas.planner_schema import PlannerOutput
 
 PLANNER_SYSTEM_PROMPT = """
 You are a SQL planning assistant.
@@ -16,6 +15,7 @@ Rules:
 - Do NOT generate SQL.
 - Do NOT hallucinate tables.
 """
+
 
 class PlannerAgent(BaseAgent):
 
@@ -33,4 +33,3 @@ class PlannerAgent(BaseAgent):
         )
 
         return await self.model.generate(request, PlannerOutput)
-    

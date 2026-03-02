@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from app.core.constants import (DEFAULT_AUTOLIMIT, MAX_LIMIT_ALLOWED,
                                 DatabaseDialect)
 from app.core.exceptions import PolicyViolationError
+from app.schemas.validation_schema import ValidationOutput
 
 _SQL_COMMENT_RE = re.compile(r"(--[^\n]*\n)|(/\*.*?\*/)", re.DOTALL)
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -35,7 +36,7 @@ class SQLPolicyEngine:
     auto_limit: int = DEFAULT_AUTOLIMIT
     max_limit: int = MAX_LIMIT_ALLOWED
 
-    def enforce_readonly(self, sql: str) -> str:
+    def enforce_readonly(self, sql: str) -> ValidationOutput:
         normalized = normalize_sql(sql)
 
         if _FORBIDDEN_KEYWORDS.search(normalized):
@@ -48,20 +49,35 @@ class SQLPolicyEngine:
                 "Only SELECT queries are allowed in Iteration 1."
             )
 
-        limited = self._inject_or_validate_limit(normalized)
+        contains_select_star = "SELECT *" in normalized.upper()
 
-        return limited
+        limit_injected = False
+        limit_value = None
 
-    def _inject_or_validate_limit(self, sql: str) -> str:
-        m = _LIMIT_RE.search(sql)
+        m = _LIMIT_RE.search(normalized)
 
         if not m:
-            return f"{sql} LIMIT {self.auto_limit}"
+            normalized = f"{normalized} LIMIT {self.auto_limit}"
+            limit_injected = True
+            limit_value = self.auto_limit
+        else:
+            limit_value = int(m.group(1))
+            if limit_value > self.max_limit:
+                raise PolicyViolationError(
+                    f"LIMIT {limit_value} exceeds max allowed LIMIT {self.max_limit}."
+                )
 
-        limit_val = int(m.group(1))
-        if limit_val > self.max_limit:
-            raise PolicyViolationError(
-                f"LIMIT {limit_val} exceeds max allowed LIMIT {self.max_limit}."
-            )
+        # Risk classification
+        if contains_select_star:
+            risk = "medium"
+        else:
+            risk = "low"
 
-        return sql
+        return ValidationOutput(
+            ok=True,
+            risk_level=risk,
+            limit_injected=limit_injected,
+            limit_value=limit_value,
+            contains_select_star=contains_select_star,
+            normalized_sql=normalized,
+        )

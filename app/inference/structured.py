@@ -1,6 +1,8 @@
-from typing import TypeVar
 import json
+from typing import TypeVar
+
 from pydantic import BaseModel
+
 from app.inference.base import Model
 from app.inference.types import ModelRequest
 from app.orchestration.structured_validator import validate_contract
@@ -16,7 +18,7 @@ class StructuredModel:
 
     async def generate(self, request: ModelRequest, schema: type[T]) -> T:
         response = await self.model.generate(request)
-        
+
         try:
             raw_text = response.raw_text.strip()
             parsed_response = json.loads(raw_text)

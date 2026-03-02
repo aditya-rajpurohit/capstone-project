@@ -1,8 +1,9 @@
 import os
+
 from google import genai
+
 from app.inference.base import Model
 from app.inference.types import ModelRequest, ModelResponse
-
 
 _KEY = os.getenv("GEMINI_API_KEY")
 
@@ -28,7 +29,7 @@ class Gemini(Model):
 
         if response.text is None:
             raise ValueError("Gemini returned empty response.")
-        
+
         return ModelResponse(
             raw_text=response.text,
             provider="gemini",
