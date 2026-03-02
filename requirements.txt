@@ -15,3 +15,6 @@ httpx
 black
 isort
 pre-commit
+openai
+anthropic
+google-genai
