@@ -16,4 +16,3 @@ class ModelResponse:
     raw_text: str
     provider: str
     model: str
-    

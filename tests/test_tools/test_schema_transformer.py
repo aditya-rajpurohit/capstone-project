@@ -1,6 +1,7 @@
 import pytest
-from app.tools.schema_transformer import SchemaTransformer
+
 from app.core.constants import DatabaseDialect
+from app.tools.schema_transformer import SchemaTransformer
 
 
 def test_schema_transformer_basic():
@@ -31,4 +32,3 @@ def test_schema_transformer_basic():
     assert schema_context.tables[0].name == "users"
     assert len(schema_context.tables[0].columns) == 2
     assert schema_context.confidence == 1.0
-    

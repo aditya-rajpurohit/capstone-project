@@ -18,6 +18,8 @@ class ExecutionTraceRecord(BaseModel):
     validation_result: dict[str, Any] | None = None
     execution_result: dict[str, Any] | None = None
 
+    reflection_history: list[dict] = Field(default_factory=list)
+
     final_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     timestamp_iso: str
     prompt_hash: str | None = None

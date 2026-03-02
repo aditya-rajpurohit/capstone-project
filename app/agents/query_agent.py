@@ -1,10 +1,9 @@
 from app.agents.base_agent import BaseAgent
-from app.schemas.query_schema import QueryOutput
-from app.schemas.planner_schema import PlannerOutput
-from app.schemas.schema_context_schema import SchemaContext
 from app.inference.structured import StructuredModel
 from app.inference.types import ModelRequest
-
+from app.schemas.planner_schema import PlannerOutput
+from app.schemas.query_schema import QueryOutput
+from app.schemas.schema_context_schema import SchemaContext
 
 QUERY_SYSTEM_PROMPT = """
 You are a SQL generation assistant.
@@ -25,17 +24,29 @@ class QueryAgent(BaseAgent):
         self.model = model
         self.model_name = model_name
 
-    async def run(self, plan: PlannerOutput, schema_context: SchemaContext) -> QueryOutput:
+    async def run(
+        self,
+        plan: PlannerOutput,
+        schema_context: SchemaContext,
+        error_feedback: str | None = None,
+    ) -> QueryOutput:
 
-        request = ModelRequest(system_prompt=QUERY_SYSTEM_PROMPT, user_prompt=f"""
-                Plan:
-                {plan.model_dump_json(indent=2)}
+        user_prompt = f"""
+            Plan: {plan.model_dump_json(indent=2)}
+            Schema: {schema_context.model_dump_json(indent=2)}
+        """
 
-                Schema:
-                {schema_context.model_dump_json(indent=2)}
-                """,
-                model=self.model_name,
-                temperature=0.0,
-            )
+        if error_feedback:
+            user_prompt += f"""
+                The previous SQL query failed with this error: {error_feedback}
+                Generate a corrected SQL query.
+            """
+
+        request = ModelRequest(
+            system_prompt=QUERY_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            model=self.model_name,
+            temperature=0.0,
+        )
 
         return await self.model.generate(request, QueryOutput)

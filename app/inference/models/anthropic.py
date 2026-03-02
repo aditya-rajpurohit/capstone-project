@@ -1,9 +1,10 @@
 import os
+
 import anthropic
-from app.inference.base import Model
-from app.inference.types import ModelRequest, ModelResponse
 from anthropic.types import TextBlock
 
+from app.inference.base import Model
+from app.inference.types import ModelRequest, ModelResponse
 
 _KEY = os.getenv("ANTHROPIC_API_KEY")
 
@@ -22,15 +23,11 @@ class Anthropic(Model):
             temperature=request.temperature,
             max_tokens=request.max_tokens or 1024,
             system=request.system_prompt,
-            messages=[
-                {"role": "user", "content": request.user_prompt}
-            ],
+            messages=[{"role": "user", "content": request.user_prompt}],
         )
 
         text_parts = [
-            block.text
-            for block in response.content
-            if isinstance(block, TextBlock)
+            block.text for block in response.content if isinstance(block, TextBlock)
         ]
 
         text = "\n".join(text_parts)

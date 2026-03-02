@@ -9,5 +9,4 @@ class BaseAgent(ABC):
     """
 
     @abstractmethod
-    async def run(self, *args, **kwargs) -> Any:
-        ...
+    async def run(self, *args, **kwargs) -> Any: ...

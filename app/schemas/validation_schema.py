@@ -12,5 +12,9 @@ class RuleFinding(BaseModel):
 class ValidationOutput(BaseModel):
     ok: bool
     risk_level: Literal["low", "medium", "high"]
-    findings: List[RuleFinding] = Field(default_factory=lambda: [])
+    limit_injected: bool = False
+    limit_value: int | None = None
+    contains_select_star: bool = False
     normalized_sql: str | None = None
+    # findings: List[RuleFinding] = Field(default_factory=lambda: [])
+    # confidence_score: float
