@@ -2,6 +2,8 @@ import pytest
 import os
 from app.tools.db_connector.postgres_connector import PostgresConnector
 from app.orchestration.execution_controller import ExecutionController
+from app.agents.planner_agent import MockPlannerAgent
+from app.agents.query_agent import MockQueryAgent
 
 TEST_DSN = os.getenv("TEST_DSN")
 
@@ -25,7 +27,7 @@ async def test_full_workflow():
         ON CONFLICT DO NOTHING;
     """)
 
-    controller = ExecutionController(connector)
+    controller = ExecutionController(connector, planner_agent=MockPlannerAgent(), query_agent=MockQueryAgent())
     trace = await controller.run("Show all users")
 
     assert trace.state.name in ["DONE", "FAILED"]
