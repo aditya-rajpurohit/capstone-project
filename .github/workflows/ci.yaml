@@ -40,5 +40,6 @@ jobs:
       - name: Run tests
         env:
           TEST_DSN: postgresql://agentic:agentic@localhost:5432/agentic_db
+          TEST_KEY: None
         run: |
           pytest
