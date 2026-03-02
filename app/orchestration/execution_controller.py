@@ -1,8 +1,11 @@
 import datetime
+from app.agents.planner_agent import PlannerAgent
+from app.agents.query_agent import QueryAgent
 from app.core.constants import EngineState
 from app.core.exceptions import PolicyViolationError
 from app.orchestration.state_machine import StateMachine
 from app.orchestration.policy_engine import SQLPolicyEngine
+from app.tools.db_connector.base_connector import BaseConnector
 from app.tools.schema_transformer import SchemaTransformer
 from app.tools.execution_engine import ExecutionEngine
 from app.schemas.execution_schema import ExecutionResult
@@ -12,9 +15,12 @@ from app.schemas.trace_schema import ExecutionTraceRecord
 class ExecutionController:
     """Deterministic orchestrator - Owns the workflow"""
 
-    def __init__(self, connector) -> None:
+    def __init__(self, connector: BaseConnector, planner_agent: PlannerAgent, query_agent: QueryAgent) -> None:
         self.state_machine = StateMachine()
         self.connector = connector
+        self.planner_agent = planner_agent
+        self.query_agent = query_agent
+
         self.policy_engine = SQLPolicyEngine(dialect=connector.dialect)
         self.execution_engine = ExecutionEngine(connector)
         self.schema_transformer = SchemaTransformer(connector.dialect)
@@ -32,14 +38,8 @@ class ExecutionController:
             self.state_machine.transition(EngineState.PLAN)
 
             # MOCK Planner
-            plan = {
-                "intent": "list",
-                "operation": "SELECT",
-                "entities": [],
-                "constraints": [],
-                "confidence": 1.0,
-            }
-            trace.plan = plan
+            plan = await self.planner_agent.run(user_query)
+            trace.plan = plan.model_dump()
 
             # PLAN → SCHEMA_RETRIEVAL
             self.state_machine.transition(EngineState.SCHEMA_RETRIEVAL)
@@ -52,16 +52,12 @@ class ExecutionController:
             self.state_machine.transition(EngineState.QUERY_GENERATION)
 
             # MOCK Query Agent
-            generated_sql = "SELECT * FROM users"
-            trace.generated_query = {
-                "sql": generated_sql,
-                "confidence": 1.0,
-            }
+            query_output = await self.query_agent.run(plan, schema_context)
+            trace.generated_query = query_output.model_dump()
 
             # QUERY_GENERATION → VALIDATION
             self.state_machine.transition(EngineState.VALIDATION)
-
-            validated_sql = self.policy_engine.enforce_readonly(generated_sql)
+            validated_sql = self.policy_engine.enforce_readonly(query_output.sql)
 
             # VALIDATION → EXECUTION
             self.state_machine.transition(EngineState.EXECUTION)
@@ -76,8 +72,8 @@ class ExecutionController:
                 self.state_machine.transition(EngineState.FAILED)
                 trace.state = EngineState.FAILED
 
-            trace.final_confidence = 1.0
             trace.retry_count = self.state_machine.reflection_retries
+            trace.final_confidence = query_output.confidence
 
             return trace
 
@@ -87,6 +83,18 @@ class ExecutionController:
             trace.execution_result = {
                 "status": "failed",
                 "error_type": "policy_violation",
+                "error_message": str(e),
+            }
+            
+            return trace
+        
+        except Exception as e:
+            # Safety fallback
+            self.state_machine.transition(EngineState.FAILED)
+            trace.state = EngineState.FAILED
+            trace.execution_result = {
+                "status": "failed",
+                "error_type": "controller_error",
                 "error_message": str(e),
             }
             
