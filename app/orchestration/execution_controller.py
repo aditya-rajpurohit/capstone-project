@@ -1,5 +1,6 @@
 import datetime
 
+from app.agents.critic_agent import CriticAgent
 from app.agents.planner_agent import PlannerAgent
 from app.agents.query_agent import QueryAgent
 from app.agents.reflection_agent import ReflectionAgent
@@ -14,6 +15,39 @@ from app.tools.execution_engine import ExecutionEngine
 from app.tools.schema_transformer import SchemaTransformer
 
 
+def _compute_score(
+    model_confidence: float,
+    validation_result: dict | None,
+    critic_result: dict | None,
+    retry_count: int,
+) -> tuple[float, float, float, float]:
+    # Policy risk penalty
+    risk_penalty = 0.0
+    if validation_result:
+        if validation_result.get("risk_level") == "medium":
+            risk_penalty = 0.1
+        elif validation_result.get("risk_level") == "high":
+            risk_penalty = 0.2
+
+    # Critic penalty
+    critic_penalty = 0.0
+    if critic_result:
+        if critic_result.get("risk_level") == "medium":
+            critic_penalty = 0.1
+        elif critic_result.get("risk_level") == "high":
+            critic_penalty = 0.2
+
+    # Retry penalty
+    retry_penalty = retry_count * 0.05
+
+    final_score = max(
+        0.0,
+        model_confidence - risk_penalty - critic_penalty - retry_penalty,
+    )
+
+    return final_score, risk_penalty, critic_penalty, retry_penalty
+
+
 class ExecutionController:
     """Deterministic orchestrator - Owns the workflow"""
 
@@ -23,12 +57,14 @@ class ExecutionController:
         planner_agent: PlannerAgent,
         query_agent: QueryAgent,
         reflection_agent: ReflectionAgent,
+        critic_agent: CriticAgent,
     ) -> None:
         self.state_machine = StateMachine()
         self.connector = connector
         self.planner_agent = planner_agent
         self.query_agent = query_agent
         self.reflection_agent = reflection_agent
+        self.critic_agent = critic_agent
 
         self.policy_engine = SQLPolicyEngine(dialect=connector.dialect)
         self.execution_engine = ExecutionEngine(connector)
@@ -70,6 +106,12 @@ class ExecutionController:
             trace.generated_query = query_output.model_dump()
 
             # ----------------------------
+            # Critic Agent
+            # ----------------------------
+            critic_output = await self.critic_agent.run(query_output, schema_context)
+            trace.critic_result = critic_output.model_dump()
+
+            # ----------------------------
             # Validation
             # ----------------------------
             self.state_machine.transition(EngineState.VALIDATION)
@@ -88,6 +130,7 @@ class ExecutionController:
                 validated_sql
             )
             trace.execution_result = execution_result.model_dump()
+            trace.execution_latency_ms = execution_result.elapsed_ms
 
             # ----------------------------
             # Success Path
@@ -96,7 +139,23 @@ class ExecutionController:
                 self.state_machine.transition(EngineState.DONE)
                 trace.state = EngineState.DONE
                 trace.retry_count = self.state_machine.reflection_retries
+                trace.execution_latency_ms = execution_result.elapsed_ms
+
+                final_score, risk_penalty, critic_penalty, retry_penalty = (
+                    _compute_score(
+                        model_confidence=query_output.confidence,
+                        validation_result=trace.validation_result,
+                        critic_result=trace.critic_result,
+                        retry_count=trace.retry_count,
+                    )
+                )
+
+                trace.risk_penalty = risk_penalty
+                trace.critic_penalty = critic_penalty
+                trace.retry_penalty = retry_penalty
+                trace.final_score = final_score
                 trace.final_confidence = query_output.confidence
+
                 return trace
 
             # ----------------------------
@@ -136,6 +195,12 @@ class ExecutionController:
                 )
 
                 trace.generated_query = query_output.model_dump()
+
+                # CRITIC AGENT
+                critic_output = await self.critic_agent.run(
+                    query_output, schema_context
+                )
+                trace.critic_result = critic_output.model_dump()
 
                 # QUERY_GENERATION → VALIDATION
                 self.state_machine.transition(EngineState.VALIDATION)

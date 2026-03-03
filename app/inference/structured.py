@@ -17,7 +17,7 @@ class StructuredModel:
         self.model = model
 
     async def generate(self, request: ModelRequest, schema: type[T]) -> T:
-        response = await self.model.generate(request)
+        response = await self.model.generate(request=request, schema=schema)
 
         try:
             raw_text = response.raw_text.strip()
