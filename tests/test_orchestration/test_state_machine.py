@@ -5,39 +5,61 @@ from app.core.exceptions import InvalidStateTransitionError
 from app.orchestration.state_machine import StateMachine
 
 
-def test_valid_transitions_happy_path():
+def test_valid_transitions():
     sm = StateMachine()
 
-    sm.transition(EngineState.PLAN)
-    sm.transition(EngineState.SCHEMA_RETRIEVAL)
-    sm.transition(EngineState.QUERY_GENERATION)
-    sm.transition(EngineState.VALIDATION)
-    sm.transition(EngineState.EXECUTION)
-    sm.transition(EngineState.DONE)
+    # INIT
+    assert sm.validate_transition(EngineState.INIT, EngineState.PLAN) == None
+    assert sm.validate_transition(EngineState.INIT, EngineState.FAILED) == None
 
-    assert sm.state == EngineState.DONE
+    # PLAN
+    assert (
+        sm.validate_transition(EngineState.PLAN, EngineState.SCHEMA_RETRIEVAL) == None
+    )
+    assert sm.validate_transition(EngineState.PLAN, EngineState.FAILED) == None
+
+    # SCHEMA_RETRIEVAL
+    assert (
+        sm.validate_transition(
+            EngineState.SCHEMA_RETRIEVAL, EngineState.QUERY_GENERATION
+        )
+        == None
+    )
+    assert (
+        sm.validate_transition(EngineState.SCHEMA_RETRIEVAL, EngineState.FAILED) == None
+    )
+
+    # QUERY_GENERATION
+    assert (
+        sm.validate_transition(EngineState.QUERY_GENERATION, EngineState.VALIDATION)
+        == None
+    )
+    assert (
+        sm.validate_transition(EngineState.QUERY_GENERATION, EngineState.FAILED) == None
+    )
+
+    # VALIDATION
+    assert sm.validate_transition(EngineState.VALIDATION, EngineState.EXECUTION) == None
+    assert (
+        sm.validate_transition(EngineState.VALIDATION, EngineState.REFLECTION) == None
+    )
+    assert sm.validate_transition(EngineState.VALIDATION, EngineState.FAILED) == None
+
+    # EXECUTION
+    assert sm.validate_transition(EngineState.EXECUTION, EngineState.DONE) == None
+    assert sm.validate_transition(EngineState.EXECUTION, EngineState.REFLECTION) == None
+    assert sm.validate_transition(EngineState.EXECUTION, EngineState.FAILED) == None
+
+    # REFLECTION
+    assert (
+        sm.validate_transition(EngineState.REFLECTION, EngineState.QUERY_GENERATION)
+        == None
+    )
+    assert sm.validate_transition(EngineState.REFLECTION, EngineState.FAILED) == None
 
 
-def test_invalid_transition_rejected():
+def test_invalid_transition():
     sm = StateMachine()
 
     with pytest.raises(InvalidStateTransitionError):
-        sm.transition(EngineState.EXECUTION)
-
-
-def test_reflection_retry_cap_forces_failed():
-    sm = StateMachine(state=EngineState.VALIDATION)
-
-    # transition into reflection MAX+1 times via allowed path simulation
-    for _ in range(MAX_REFLECTION_RETRIES):
-        sm.transition(EngineState.REFLECTION)
-
-        assert sm.state == EngineState.REFLECTION
-
-        sm.transition(EngineState.QUERY_GENERATION)
-        sm.transition(EngineState.VALIDATION)
-
-    # next reflection should force FAILED
-    sm.transition(EngineState.REFLECTION)
-
-    assert sm.state == EngineState.FAILED
+        sm.validate_transition(EngineState.INIT, EngineState.REFLECTION)

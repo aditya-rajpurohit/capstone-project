@@ -1,5 +1,10 @@
 from enum import Enum
 
+DEFAULT_TIMEOUT_SECONDS = 5
+DEFAULT_AUTOLIMIT = 100
+MAX_LIMIT_ALLOWED = 1000
+MAX_REFLECTION_RETRIES = 2
+
 
 class EngineState(str, Enum):
     INIT = "INIT"
@@ -15,12 +20,6 @@ class EngineState(str, Enum):
 
 class DatabaseDialect(str, Enum):
     POSTGRES = "POSTGRES"
-    # MYSQL = "MYSQL"
-    # SQLITE = "SQLITE"
-    # MSSQL = "MSSQL"
-
-
-DEFAULT_TIMEOUT_SECONDS = 5
-DEFAULT_AUTOLIMIT = 100
-MAX_LIMIT_ALLOWED = 1000
-MAX_REFLECTION_RETRIES = 2
+    MYSQL = "MYSQL"
+    SQLITE = "SQLITE"
+    MSSQL = "MSSQL"

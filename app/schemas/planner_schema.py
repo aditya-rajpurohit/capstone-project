@@ -1,11 +1,11 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class PlannerEntity(BaseModel):
     name: str = Field(..., min_length=1)
-    type: str | None = None
+    type: Optional[str] = None
 
 
 class PlannerConstraint(BaseModel):
@@ -16,6 +16,6 @@ class PlannerConstraint(BaseModel):
 class PlannerOutput(BaseModel):
     intent: str = Field(..., min_length=1)
     operation: Literal["SELECT"] = "SELECT"
-    entities: list[PlannerEntity] = Field(default_factory=lambda: [])
-    constraints: list[PlannerConstraint] = Field(default_factory=lambda: [])
+    entities: list[PlannerEntity] = Field(default_factory=list)
+    constraints: list[PlannerConstraint] = Field(default_factory=list)
     confidence: float = Field(..., ge=0.0, le=1.0)

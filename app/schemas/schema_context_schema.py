@@ -15,11 +15,10 @@ class ForeignKeyInfo(BaseModel):
 
 class TableInfo(BaseModel):
     name: str
-    columns: list[ColumnInfo] = Field(default_factory=lambda: [])
-    foreign_keys: list[ForeignKeyInfo] = Field(default_factory=lambda: [])
+    columns: list[ColumnInfo] = Field(default_factory=list)
+    foreign_keys: list[ForeignKeyInfo] = Field(default_factory=list)
 
 
 class SchemaContext(BaseModel):
     dialect: str
-    tables: list[TableInfo] = Field(default_factory=lambda: [])
-    confidence: float = Field(..., ge=0.0, le=1.0)
+    tables: list[TableInfo] = Field(default_factory=list)

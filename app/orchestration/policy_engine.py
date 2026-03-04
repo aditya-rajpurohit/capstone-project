@@ -22,7 +22,7 @@ def _strip_comments(sql: str) -> str:
     return re.sub(_SQL_COMMENT_RE, " ", sql)
 
 
-def normalize_sql(sql: str) -> str:
+def _normalize_sql(sql: str) -> str:
     sql = _strip_comments(sql)
     sql = sql.strip().rstrip(";")
     sql = re.sub(_WHITESPACE_RE, " ", sql)
@@ -31,25 +31,25 @@ def normalize_sql(sql: str) -> str:
 
 
 @dataclass(frozen=True)
-class SQLPolicyEngine:
+class PolicyEngine:
     dialect: DatabaseDialect = DatabaseDialect.POSTGRES
     auto_limit: int = DEFAULT_AUTOLIMIT
     max_limit: int = MAX_LIMIT_ALLOWED
 
     def enforce_readonly(self, sql: str) -> ValidationOutput:
-        normalized = normalize_sql(sql)
+        normalized = _normalize_sql(sql)
 
         if _FORBIDDEN_KEYWORDS.search(normalized):
             raise PolicyViolationError(
-                "DDL/DML statements are not allowed (read-only policy)."
+                "Error: DDL/DML statements are not allowed (read-only policy)!"
             )
 
         if not _SELECT_RE.match(normalized):
-            raise PolicyViolationError(
-                "Only SELECT queries are allowed in Iteration 1."
-            )
+            raise PolicyViolationError("Error: Only SELECT queries are allowed!")
 
-        contains_select_star = "SELECT *" in normalized.upper()
+        contains_select_star = bool(
+            re.search(r"\bSELECT\s+\*\b", normalized, re.IGNORECASE)
+        )
 
         limit_injected = False
         limit_value = None
@@ -64,14 +64,11 @@ class SQLPolicyEngine:
             limit_value = int(m.group(1))
             if limit_value > self.max_limit:
                 raise PolicyViolationError(
-                    f"LIMIT {limit_value} exceeds max allowed LIMIT {self.max_limit}."
+                    f"Error: LIMIT {limit_value} exceeds max allowed LIMIT {self.max_limit}!"
                 )
 
         # Risk classification
-        if contains_select_star:
-            risk = "medium"
-        else:
-            risk = "low"
+        risk = "medium" if contains_select_star else "low"
 
         return ValidationOutput(
             ok=True,

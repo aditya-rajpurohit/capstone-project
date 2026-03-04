@@ -1,9 +1,8 @@
-from app.agents.base_agent import BaseAgent
+from app.agents.base import BaseAgent
+from app.context.agent_context import AgentContext
 from app.inference.structured import StructuredModel
 from app.inference.types import ModelRequest
 from app.schemas.critic_schema import CriticOutput
-from app.schemas.query_schema import QueryOutput
-from app.schemas.schema_context_schema import SchemaContext
 
 CRITIC_SYSTEM_PROMPT = """
     You are a SQL review assistant.
@@ -24,17 +23,13 @@ class CriticAgent(BaseAgent):
         self.model = model
         self.model_name = model_name
 
-    async def run(
-        self,
-        query_output: QueryOutput,
-        schema_context: SchemaContext,
-    ) -> CriticOutput:
+    async def run(self, context: AgentContext) -> CriticOutput:
 
         request = ModelRequest(
             system_prompt=CRITIC_SYSTEM_PROMPT,
             user_prompt=f"""
-                SQL: {query_output.sql}
-                Schema: {schema_context.model_dump_json(indent=2)}
+                SQL: {context.previous_sql}
+                Schema: {context.filtered_schema}
             """,
             model=self.model_name,
             temperature=0.0,
