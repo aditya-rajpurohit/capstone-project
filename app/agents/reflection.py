@@ -1,11 +1,10 @@
-from app.agents.base_agent import BaseAgent
+from app.agents.base import BaseAgent
+from app.context.agent_context import AgentContext
 from app.inference.structured import StructuredModel
 from app.inference.types import ModelRequest
-from app.schemas.planner_schema import PlannerOutput
 from app.schemas.query_schema import QueryOutput
-from app.schemas.schema_context_schema import SchemaContext
 
-QUERY_SYSTEM_PROMPT = """
+REFLECTION_SYSTEM_PROMPT = """
     You are a SQL generation assistant.
 
     Rules:
@@ -18,32 +17,24 @@ QUERY_SYSTEM_PROMPT = """
 """
 
 
-class QueryAgent(BaseAgent):
+class ReflectionAgent(BaseAgent):
 
     def __init__(self, model: StructuredModel, model_name: str) -> None:
         self.model = model
         self.model_name = model_name
 
-    async def run(
-        self,
-        plan: PlannerOutput,
-        schema_context: SchemaContext,
-        error_feedback: str | None = None,
-    ) -> QueryOutput:
+    async def run(self, context: AgentContext) -> QueryOutput:
 
         user_prompt = f"""
-            Plan: {plan.model_dump_json(indent=2)}
-            Schema: {schema_context.model_dump_json(indent=2)}
+            Plan: {context.plan}
+            Schema: {context.filtered_schema}
+            Previous SQL: {context.previous_sql}
+            Error: {context.error_message}
+            Generate a corrected SQL query.
         """
 
-        if error_feedback:
-            user_prompt += f"""
-                The previous SQL query failed with this error: {error_feedback}
-                Generate a corrected SQL query.
-            """
-
         request = ModelRequest(
-            system_prompt=QUERY_SYSTEM_PROMPT,
+            system_prompt=REFLECTION_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             model=self.model_name,
             temperature=0.0,

@@ -1,4 +1,5 @@
-from app.agents.base_agent import BaseAgent
+from app.agents.base import BaseAgent
+from app.context.agent_context import AgentContext
 from app.inference.structured import StructuredModel
 from app.inference.types import ModelRequest
 from app.schemas.planner_schema import PlannerOutput
@@ -25,11 +26,11 @@ class PlannerAgent(BaseAgent):
         self.model = model
         self.model_name = model_name
 
-    async def run(self, user_query: str) -> PlannerOutput:
+    async def run(self, context: AgentContext) -> PlannerOutput:
 
         request = ModelRequest(
             system_prompt=PLANNER_SYSTEM_PROMPT,
-            user_prompt=user_query,
+            user_prompt=context.user_query,
             model=self.model_name,
             temperature=0.0,
         )

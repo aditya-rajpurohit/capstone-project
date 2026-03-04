@@ -31,4 +31,3 @@ def test_schema_transformer_basic():
     assert len(schema_context.tables) == 1
     assert schema_context.tables[0].name == "users"
     assert len(schema_context.tables[0].columns) == 2
-    assert schema_context.confidence == 1.0

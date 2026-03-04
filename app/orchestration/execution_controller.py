@@ -1,12 +1,11 @@
 import datetime
 
-from app.agents.critic_agent import CriticAgent
-from app.agents.planner_agent import PlannerAgent
-from app.agents.query_agent import QueryAgent
-from app.agents.reflection_agent import ReflectionAgent
-from app.core.constants import EngineState
+from app.agents.base import BaseAgent
+from app.context.context_builder import ContextBuilder
+from app.core.constants import MAX_REFLECTION_RETRIES, EngineState
 from app.core.exceptions import PolicyViolationError
-from app.orchestration.policy_engine import SQLPolicyEngine
+from app.memory.execution_memory import ExecutionMemory
+from app.orchestration.policy_engine import PolicyEngine
 from app.orchestration.state_machine import StateMachine
 from app.schemas.execution_schema import ExecutionResult
 from app.schemas.trace_schema import ExecutionTraceRecord
@@ -21,7 +20,7 @@ def _compute_score(
     critic_result: dict | None,
     retry_count: int,
 ) -> tuple[float, float, float, float]:
-    # Policy risk penalty
+
     risk_penalty = 0.0
     if validation_result:
         if validation_result.get("risk_level") == "medium":
@@ -29,7 +28,6 @@ def _compute_score(
         elif validation_result.get("risk_level") == "high":
             risk_penalty = 0.2
 
-    # Critic penalty
     critic_penalty = 0.0
     if critic_result:
         if critic_result.get("risk_level") == "medium":
@@ -37,7 +35,6 @@ def _compute_score(
         elif critic_result.get("risk_level") == "high":
             critic_penalty = 0.2
 
-    # Retry penalty
     retry_penalty = retry_count * 0.05
 
     final_score = max(
@@ -49,210 +46,230 @@ def _compute_score(
 
 
 class ExecutionController:
-    """Deterministic orchestrator - Owns the workflow"""
+    """
+    Deterministic Orchestrator.
+    Owns execution flow.
+    Owns ExecutionMemory.
+    StateMachine only validates transitions.
+    """
 
     def __init__(
         self,
         connector: BaseConnector,
-        planner_agent: PlannerAgent,
-        query_agent: QueryAgent,
-        reflection_agent: ReflectionAgent,
-        critic_agent: CriticAgent,
+        planner_agent: BaseAgent,
+        query_agent: BaseAgent,
+        reflection_agent: BaseAgent,
+        critic_agent: BaseAgent,
     ) -> None:
-        self.state_machine = StateMachine()
+
         self.connector = connector
         self.planner_agent = planner_agent
         self.query_agent = query_agent
         self.reflection_agent = reflection_agent
         self.critic_agent = critic_agent
 
-        self.policy_engine = SQLPolicyEngine(dialect=connector.dialect)
+        self.state_machine = StateMachine()
+
+        self.policy_engine = PolicyEngine(dialect=connector.dialect)
         self.execution_engine = ExecutionEngine(connector)
         self.schema_transformer = SchemaTransformer(connector.dialect)
 
     async def run(self, user_query: str) -> ExecutionTraceRecord:
 
-        trace = ExecutionTraceRecord(
+        memory = ExecutionMemory(
             user_query=user_query,
-            state=self.state_machine.state,
-            retry_count=0,
-            timestamp_iso=datetime.datetime.now(datetime.UTC).isoformat(),
+            max_retries=MAX_REFLECTION_RETRIES,
         )
 
+        memory.current_state = EngineState.INIT
+
         try:
-            # ----------------------------
-            # INIT → PLAN
-            # ----------------------------
-            self.state_machine.transition(EngineState.PLAN)
+            # ---------------- INIT → PLAN ----------------
+            self._transition(memory, EngineState.PLAN)
 
-            plan = await self.planner_agent.run(user_query)
-            trace.plan = plan.model_dump()
+            planner_context = ContextBuilder.build_for_planner(memory)
+            plan_output = await self.planner_agent.run(planner_context)
 
-            # ----------------------------
-            # PLAN → SCHEMA_RETRIEVAL
-            # ----------------------------
-            self.state_machine.transition(EngineState.SCHEMA_RETRIEVAL)
+            memory.planner_output = plan_output.model_dump()
+
+            # ---------------- PLAN → SCHEMA_RETRIEVAL ----------------
+            self._transition(memory, EngineState.SCHEMA_RETRIEVAL)
 
             raw_schema = await self.connector.introspect_schema()
             schema_context = self.schema_transformer.transform(raw_schema)
-            trace.schema_context = schema_context.model_dump()
 
-            # ----------------------------
-            # First Query Generation
-            # ----------------------------
-            self.state_machine.transition(EngineState.QUERY_GENERATION)
+            memory.filtered_schema = schema_context.model_dump()
 
-            query_output = await self.query_agent.run(plan, schema_context)
-            trace.generated_query = query_output.model_dump()
+            # ---------------- SCHEMA → QUERY_GENERATION ----------------
+            self._transition(memory, EngineState.QUERY_GENERATION)
 
-            # ----------------------------
-            # Critic Agent
-            # ----------------------------
-            critic_output = await self.critic_agent.run(query_output, schema_context)
-            trace.critic_result = critic_output.model_dump()
+            query_context = ContextBuilder.build_for_query(memory)
+            query_output = await self.query_agent.run(query_context)
 
-            # ----------------------------
-            # Validation
-            # ----------------------------
-            self.state_machine.transition(EngineState.VALIDATION)
+            memory.generated_sql = query_output.sql
+            memory.confidence = query_output.confidence
 
-            validation = self.policy_engine.enforce_readonly(query_output.sql)
-            trace.validation_result = validation.model_dump()
-            assert validation.normalized_sql is not None, "Validation produced no SQL."
+            # ---------------- CRITIC ----------------
+            critic_context = ContextBuilder.build_for_query(memory)
+            critic_context.previous_sql = memory.generated_sql
+
+            critic_output = await self.critic_agent.run(critic_context)
+            memory.critic_output = critic_output.model_dump()
+
+            # ---------------- VALIDATION ----------------
+            self._transition(memory, EngineState.VALIDATION)
+
+            if memory.generated_sql is None:
+                raise ValueError("Error: generated_sql is None!")
+
+            validation = self.policy_engine.enforce_readonly(memory.generated_sql)
+            memory.validation_output = validation.model_dump()
+
             validated_sql = validation.normalized_sql
 
-            # ----------------------------
-            # Execution
-            # ----------------------------
-            self.state_machine.transition(EngineState.EXECUTION)
+            # ---------------- EXECUTION ----------------
+            self._transition(memory, EngineState.EXECUTION)
+
+            if validated_sql is None:
+                raise ValueError("Error: validated_sql is None!")
 
             execution_result: ExecutionResult = await self.execution_engine.execute(
                 validated_sql
             )
-            trace.execution_result = execution_result.model_dump()
-            trace.execution_latency_ms = execution_result.elapsed_ms
 
-            # ----------------------------
-            # Success Path
-            # ----------------------------
+            memory.execution_result = execution_result.model_dump()
+            memory.execution_latency_ms = execution_result.elapsed_ms
+
             if execution_result.status == "success":
-                self.state_machine.transition(EngineState.DONE)
-                trace.state = EngineState.DONE
-                trace.retry_count = self.state_machine.reflection_retries
-                trace.execution_latency_ms = execution_result.elapsed_ms
+                self._transition(memory, EngineState.DONE)
+                memory.final_state = EngineState.DONE
+                return self._build_trace(memory)
 
-                final_score, risk_penalty, critic_penalty, retry_penalty = (
-                    _compute_score(
-                        model_confidence=query_output.confidence,
-                        validation_result=trace.validation_result,
-                        critic_result=trace.critic_result,
-                        retry_count=trace.retry_count,
-                    )
-                )
-
-                trace.risk_penalty = risk_penalty
-                trace.critic_penalty = critic_penalty
-                trace.retry_penalty = retry_penalty
-                trace.final_score = final_score
-                trace.final_confidence = query_output.confidence
-
-                return trace
-
-            # ----------------------------
-            # Reflection Path
-            # ----------------------------
+            # ---------------- REFLECTION LOOP ----------------
             while execution_result.status != "success":
 
-                # Move to reflection
-                self.state_machine.transition(EngineState.REFLECTION)
+                memory.retry_count += 1
 
-                # Retry cap reached → fail
-                if self.state_machine.state == EngineState.FAILED:
-                    trace.state = EngineState.FAILED
-                    trace.retry_count = self.state_machine.reflection_retries
-                    return trace
+                if memory.retry_count > memory.max_retries:
+                    self._transition(memory, EngineState.FAILED)
+                    memory.final_state = EngineState.FAILED
+                    return self._build_trace(memory)
 
-                error_message = (
+                self._transition(memory, EngineState.REFLECTION)
+
+                memory.last_error_message = (
                     execution_result.error_message or "Unknown execution error"
                 )
 
-                # Record reflection attempt
-                trace.reflection_history.append(
+                memory.reflection_history.append(
                     {
-                        "previous_sql": validated_sql,
-                        "error_message": error_message,
+                        "previous_sql": memory.generated_sql,
+                        "error_message": memory.last_error_message,
                     }
                 )
 
                 # REFLECTION → QUERY_GENERATION
-                self.state_machine.transition(EngineState.QUERY_GENERATION)
+                self._transition(memory, EngineState.QUERY_GENERATION)
 
-                query_output = await self.reflection_agent.run(
-                    plan,
-                    schema_context,
-                    previous_sql=validated_sql,
-                    error_message=error_message,
-                )
+                reflection_context = ContextBuilder.build_for_reflection(memory)
+                query_output = await self.reflection_agent.run(reflection_context)
 
-                trace.generated_query = query_output.model_dump()
+                memory.generated_sql = query_output.sql
+                memory.confidence = query_output.confidence
 
-                # CRITIC AGENT
-                critic_output = await self.critic_agent.run(
-                    query_output, schema_context
-                )
-                trace.critic_result = critic_output.model_dump()
+                # CRITIC
+                critic_context = ContextBuilder.build_for_query(memory)
+                critic_context.previous_sql = memory.generated_sql
 
-                # QUERY_GENERATION → VALIDATION
-                self.state_machine.transition(EngineState.VALIDATION)
+                critic_output = await self.critic_agent.run(critic_context)
+                memory.critic_output = critic_output.model_dump()
 
-                validation = self.policy_engine.enforce_readonly(query_output.sql)
-                trace.validation_result = validation.model_dump()
-                assert (
-                    validation.normalized_sql is not None
-                ), "Validation produced no SQL."
+                # VALIDATION
+                self._transition(memory, EngineState.VALIDATION)
+
+                if memory.generated_sql is None:
+                    raise ValueError("Error: generated_sql is None!")
+
+                validation = self.policy_engine.enforce_readonly(memory.generated_sql)
+                memory.validation_output = validation.model_dump()
+
                 validated_sql = validation.normalized_sql
+                memory.reflection_history[-1]["corrected_sql"] = validated_sql
 
-                # Record corrected SQL
-                trace.reflection_history[-1]["corrected_sql"] = validated_sql
+                # EXECUTION
+                self._transition(memory, EngineState.EXECUTION)
 
-                # VALIDATION → EXECUTION
-                self.state_machine.transition(EngineState.EXECUTION)
+                if validated_sql is None:
+                    raise ValueError("Error: validated_sql is None!")
 
                 execution_result = await self.execution_engine.execute(validated_sql)
-                trace.execution_result = execution_result.model_dump()
+                memory.execution_result = execution_result.model_dump()
+                memory.execution_latency_ms = execution_result.elapsed_ms
 
                 if execution_result.status == "success":
-                    self.state_machine.transition(EngineState.DONE)
-                    trace.state = EngineState.DONE
-                    trace.retry_count = self.state_machine.reflection_retries
-                    trace.final_confidence = query_output.confidence
-                    return trace
+                    self._transition(memory, EngineState.DONE)
+                    memory.final_state = EngineState.DONE
+                    return self._build_trace(memory)
 
             # Fallback
-            self.state_machine.transition(EngineState.FAILED)
-            trace.state = EngineState.FAILED
-            trace.retry_count = self.state_machine.reflection_retries
-
-            return trace
+            self._transition(memory, EngineState.FAILED)
+            memory.final_state = EngineState.FAILED
+            return self._build_trace(memory)
 
         except PolicyViolationError as e:
-            self.state_machine.transition(EngineState.FAILED)
-            trace.state = EngineState.FAILED
-            trace.execution_result = {
+            memory.final_state = EngineState.FAILED
+            memory.execution_result = {
                 "status": "failed",
                 "error_type": "policy_violation",
                 "error_message": str(e),
             }
-
-            return trace
+            return self._build_trace(memory)
 
         except Exception as e:
-            self.state_machine.transition(EngineState.FAILED)
-            trace.state = EngineState.FAILED
-            trace.execution_result = {
+            memory.final_state = EngineState.FAILED
+            memory.execution_result = {
                 "status": "failed",
                 "error_type": "controller_error",
                 "error_message": str(e),
             }
+            return self._build_trace(memory)
 
-            return trace
+    # ---------------- INTERNAL HELPERS ----------------
+
+    def _transition(self, memory: ExecutionMemory, next_state: EngineState):
+        self.state_machine.validate_transition(
+            EngineState(memory.current_state), next_state
+        )
+        memory.current_state = next_state
+
+    def _build_trace(self, memory: ExecutionMemory) -> ExecutionTraceRecord:
+
+        final_score, risk_penalty, critic_penalty, retry_penalty = _compute_score(
+            model_confidence=memory.confidence or 0.0,
+            validation_result=memory.validation_output,
+            critic_result=memory.critic_output,
+            retry_count=memory.retry_count,
+        )
+
+        return ExecutionTraceRecord(
+            request_id=memory.request_id,
+            user_query=memory.user_query,
+            timestamp_iso=datetime.datetime.now(datetime.UTC).isoformat(),
+            final_state=EngineState(memory.final_state),
+            retry_count=memory.retry_count,
+            plan=memory.planner_output,
+            filtered_schema=memory.filtered_schema,
+            generated_query=(
+                {"sql": memory.generated_sql} if memory.generated_sql else None
+            ),
+            critic_result=memory.critic_output,
+            validation_result=memory.validation_output,
+            execution_result=memory.execution_result,
+            execution_latency_ms=memory.execution_latency_ms,
+            reflection_history=memory.reflection_history,
+            final_confidence=memory.confidence,
+            risk_penalty=risk_penalty,
+            critic_penalty=critic_penalty,
+            retry_penalty=retry_penalty,
+            final_score=final_score,
+        )

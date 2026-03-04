@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Set as set_type
 
-from app.core.constants import MAX_REFLECTION_RETRIES, EngineState
+from app.core.constants import EngineState
 from app.core.exceptions import InvalidStateTransitionError
 
 ALLOWED_TRANSITIONS: dict[EngineState, set_type[EngineState]] = {
@@ -27,22 +27,10 @@ ALLOWED_TRANSITIONS: dict[EngineState, set_type[EngineState]] = {
 
 @dataclass
 class StateMachine:
-    state: EngineState = EngineState.INIT
-    reflection_retries: int = 0
-
-    def can_transition(self, to_state: EngineState) -> bool:
-        return to_state in ALLOWED_TRANSITIONS.get(self.state, set())
-
-    def transition(self, to_state: EngineState) -> None:
-        if not self.can_transition(to_state):
+    def validate_transition(
+        self, from_state: EngineState, to_state: EngineState
+    ) -> None:
+        if to_state not in ALLOWED_TRANSITIONS.get(from_state, set()):
             raise InvalidStateTransitionError(
-                f"Invalid transition: {self.state} -> {to_state}"
+                f"Invalid transition: {from_state} -> {to_state}"
             )
-
-        if to_state == EngineState.REFLECTION:
-            if self.reflection_retries >= MAX_REFLECTION_RETRIES:
-                self.state = EngineState.FAILED
-                return
-            self.reflection_retries += 1
-
-        self.state = to_state

@@ -50,11 +50,4 @@ class SchemaTransformer:
                 )
             )
 
-        # Simple deterministic confidence heuristic
-        confidence = 1.0 if tables else 0.0
-
-        return SchemaContext(
-            dialect=self.dialect.value,
-            tables=tables,
-            confidence=confidence,
-        )
+        return SchemaContext(dialect=self.dialect.value, tables=tables)

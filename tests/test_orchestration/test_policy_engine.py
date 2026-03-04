@@ -1,18 +1,18 @@
 import pytest
 
 from app.core.exceptions import PolicyViolationError
-from app.orchestration.policy_engine import SQLPolicyEngine
+from app.orchestration.policy_engine import PolicyEngine
 
 
 def test_reject_non_select():
-    pe = SQLPolicyEngine()
+    pe = PolicyEngine()
 
     with pytest.raises(PolicyViolationError):
         pe.enforce_readonly("UPDATE users SET x=1;")
 
 
 def test_injects_limit_when_missing():
-    pe = SQLPolicyEngine(auto_limit=100)
+    pe = PolicyEngine(auto_limit=100)
 
     validation = pe.enforce_readonly("SELECT id FROM users")
 
@@ -23,7 +23,7 @@ def test_injects_limit_when_missing():
 
 
 def test_allows_limit_under_max():
-    pe = SQLPolicyEngine(max_limit=1000)
+    pe = PolicyEngine(max_limit=1000)
 
     validation = pe.enforce_readonly("SELECT id FROM users LIMIT 999")
 
@@ -34,7 +34,7 @@ def test_allows_limit_under_max():
 
 
 def test_rejects_limit_over_max():
-    pe = SQLPolicyEngine(max_limit=1000)
+    pe = PolicyEngine(max_limit=1000)
 
     with pytest.raises(PolicyViolationError):
         pe.enforce_readonly("SELECT id FROM users LIMIT 5000")
