@@ -4,17 +4,25 @@ from typing import Any, Optional
 
 
 class ExecutionMemory:
-    def __init__(self, user_query: str, max_retries: int) -> None:
+
+    def __init__(self, user_query: str,active_db_ids: list[str], max_retries: int) -> None:
         # Core
         self.request_id: str = str(uuid.uuid4())
         self.user_query: str = user_query
         self.created_at: datetime = datetime.now(UTC)
+
+        self.active_db_ids = active_db_ids
 
         # State machine
         self.current_state: Optional[str] = None
         self.retry_count: int = 0
         self.max_retries: int = max_retries
         self.final_state: Optional[str] = None
+
+        # Per-DB execution state
+        self.per_db_context: dict[str, dict[str, Any]] = {}
+        # Synthesis result
+        self.synthesis_result: Optional[dict[str, Any]] = None
 
         # Intelligence outputs
         self.planner_output: Optional[dict[str, Any]] = None
@@ -35,5 +43,6 @@ class ExecutionMemory:
         self.risk_penalty: float = 0.0
         self.critic_penalty: float = 0.0
         self.retry_penalty: float = 0.0
+        
         self.final_score: Optional[float] = None
-        self.confidence: Optional[float] = None
+        self.final_confidence: Optional[float] = None
