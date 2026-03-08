@@ -16,12 +16,8 @@ class ContextBuilder:
         )
 
     @staticmethod
-    def build_for_query(memory: ExecutionMemory) -> AgentContext:
-        filtered = (
-            SchemaSelector.select(memory.filtered_schema, memory.user_query)
-            if memory.filtered_schema is not None
-            else memory.filtered_schema
-        )
+    def build_for_query(memory: ExecutionMemory, schema: dict) -> AgentContext:
+        filtered = SchemaSelector.select(schema, memory.user_query)
 
         return AgentContext(
             user_query=memory.user_query,

@@ -11,43 +11,39 @@ class SchemaTransformer:
     def __init__(self, dialect: DatabaseDialect) -> None:
         self.dialect = dialect
 
-    def transform(self, raw_snapshot: list[dict[str, Any]]) -> SchemaContext:
-        """Convert raw introspection output into SchemaContext"""
+    def transform(self, snapshot: dict[str, Any]) -> SchemaContext:
+        """
+        Convert stored schema snapshot into SchemaContext.
+        Snapshot must already be normalized.
+        """
 
         tables: list[TableInfo] = []
 
-        for table in raw_snapshot:
-            table_name = table.get("table_name")
-            if not table_name:
-                continue
-
-            columns_raw = table.get("columns", [])
-            foreign_keys_raw = table.get("foreign_keys", [])
-
-            columns: list[ColumnInfo] = [
+        for table in snapshot.get("tables", []):
+            columns = [
                 ColumnInfo(
-                    name=col["column_name"],
+                    name=col["name"],
                     data_type=col.get("data_type"),
-                    is_nullable=(col.get("is_nullable") == "YES"),
+                    is_nullable=col.get("is_nullable"),
                 )
-                for col in columns_raw
+                for col in table.get("columns", [])
             ]
 
-            foreign_keys: list[ForeignKeyInfo] = [
+            foreign_keys = [
                 ForeignKeyInfo(
-                    column=fk["column_name"],
-                    ref_table=fk["foreign_table_name"],
-                    ref_column=fk["foreign_column_name"],
+                    column=fk["column"],
+                    ref_table=fk["ref_table"],
+                    ref_column=fk["ref_column"],
                 )
-                for fk in foreign_keys_raw
+                for fk in table.get("foreign_keys", [])
             ]
 
             tables.append(
                 TableInfo(
-                    name=table_name,
+                    name=table["name"],
                     columns=columns,
                     foreign_keys=foreign_keys,
                 )
             )
 
-        return SchemaContext(dialect=self.dialect.value, tables=tables)
+        return SchemaContext(dialect=self.dialect, tables=tables)

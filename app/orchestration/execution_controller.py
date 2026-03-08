@@ -1,15 +1,19 @@
 import datetime
 
+from app.context.agent_context import AgentContext
+from app.context.chat_context import ChatContext
 from app.context.context_builder import ContextBuilder
+from app.core.constants import MAX_REFLECTION_RETRIES, EngineState
+from app.data_source.snapshot_manager import SnapshotManager
+from app.db_registry.database_registry import DatabaseRegistry
 from app.memory.execution_memory import ExecutionMemory
-from app.orchestration.state_machine import StateMachine
 from app.orchestration.policy_engine import PolicyEngine
-from app.registry.database_registry import DatabaseRegistry
+from app.orchestration.state_machine import StateMachine
 from app.schemas.trace_schema import ExecutionTraceRecord
+from app.strategy.db_router import DBRouter
 from app.tools.execution_engine import ExecutionEngine
 from app.tools.schema_transformer import SchemaTransformer
 from app.tools.synthesis_engine import SynthesisEngine
-from app.core.constants import EngineState, MAX_REFLECTION_RETRIES
 
 
 class ExecutionController:
@@ -17,12 +21,15 @@ class ExecutionController:
     def __init__(
         self,
         registry: DatabaseRegistry,
+        snapshot_manager: SnapshotManager,
         planner_agent,
         query_agent,
         reflection_agent,
         critic_agent,
     ):
         self.registry = registry
+        self.snapshot_manager = snapshot_manager
+
         self.planner_agent = planner_agent
         self.query_agent = query_agent
         self.reflection_agent = reflection_agent
@@ -31,11 +38,13 @@ class ExecutionController:
         self.state_machine = StateMachine()
         self.synthesis_engine = SynthesisEngine()
 
-    async def run(self, user_query: str, chat_context) -> ExecutionTraceRecord:
+    async def run(
+        self, user_query: str, chat_context: ChatContext
+    ) -> ExecutionTraceRecord:
 
         memory = ExecutionMemory(
             user_query=user_query,
-            active_db_ids=chat_context.active_db_ids,
+            active_database_ids=chat_context.active_database_ids,
             max_retries=MAX_REFLECTION_RETRIES,
         )
 
@@ -46,72 +55,80 @@ class ExecutionController:
 
         planner_context = ContextBuilder.build_for_planner(memory)
         planner_output = await self.planner_agent.run(planner_context)
+
         memory.planner_output = planner_output.model_dump()
         memory.final_confidence = planner_output.confidence
 
-        # ---------------- Per-DB Execution ----------------
-        for db_id in memory.active_db_ids:
+        routed_database_ids = DBRouter.route(
+            user_query, chat_context.active_database_ids, self.registry
+        )
 
-            db_unit = self.registry.get(db_id)
-            if not db_unit:
+        # ---------------- Per-DB Execution ----------------
+        for database_id in routed_database_ids:
+
+            database = self.registry.get(database_id)
+            if not database:
                 continue
 
-            connector = db_unit.connector
-            policy = PolicyEngine(dialect=connector.dialect)
+            connector = database.connector
+            policy = PolicyEngine(dialect=database.dialect)
             execution_engine = ExecutionEngine(connector)
-            transformer = SchemaTransformer(connector.dialect)
+            transformer = SchemaTransformer(database.dialect)
 
-            db_ctx = {
+            database_context = {
                 "retry_count": 0,
                 "reflection_history": [],
             }
 
-            # SCHEMA
-            raw_schema = await connector.introspect_schema()
-            schema_context = transformer.transform(raw_schema)
-            db_ctx["schema"] = schema_context.model_dump()
+            # Use stored snapshot
+            snapshot = await self.snapshot_manager.get_snapshot(database_id)
+            schema_context = transformer.transform(snapshot)
 
-            # QUERY
-            query_context = ContextBuilder.build_for_query(memory)
+            database_context["schema"] = schema_context.model_dump()
+
+            # ---------------- QUERY ----------------
+            query_context = ContextBuilder.build_for_query(
+                memory, database_context["schema"]
+            )
             query_output = await self.query_agent.run(query_context)
 
-            db_ctx["generated_sql"] = query_output.sql
+            database_context["generated_sql"] = query_output.sql
 
-            # VALIDATION
+            # ---------------- VALIDATION ----------------
             validation = policy.enforce_readonly(query_output.sql)
-            db_ctx["validation"] = validation.model_dump()
+            database_context["validation"] = validation.model_dump()
+
             validated_sql = validation.normalized_sql
 
-            # EXECUTION
             if validated_sql is None:
-                raise ValueError("ERROR: validated_sql is None!")
-            execution_result = await execution_engine.execute(validated_sql)
-            db_ctx["execution_result"] = execution_result.model_dump()
+                raise ValueError("ERROR: validated_sql is None.")
 
-            # Reflection per DB
+            # ---------------- EXECUTION ----------------
+            execution_result = await execution_engine.execute(validated_sql)
+            database_context["execution_result"] = execution_result.model_dump()
+
+            # ---------------- REFLECTION (Per DB) ----------------
             while (
                 execution_result.status != "success"
-                and db_ctx["retry_count"] < memory.max_retries
+                and database_context["retry_count"] < memory.max_retries
             ):
-                db_ctx["retry_count"] += 1
+                database_context["retry_count"] += 1
 
                 reflection_context = ContextBuilder.build_for_reflection(memory)
-                reflection_output = await self.reflection_agent.run(
-                    reflection_context
-                )
+                reflection_output = await self.reflection_agent.run(reflection_context)
 
-                db_ctx["generated_sql"] = reflection_output.sql
+                database_context["generated_sql"] = reflection_output.sql
 
                 validation = policy.enforce_readonly(reflection_output.sql)
                 validated_sql = validation.normalized_sql
 
                 if validated_sql is None:
-                    raise ValueError("ERROR: validated_sql is None!")
-                
-                execution_result = await execution_engine.execute(validated_sql)
-                db_ctx["execution_result"] = execution_result.model_dump()
+                    raise ValueError("ERROR: validated_sql is None.")
 
-            memory.per_db_context[db_id] = db_ctx
+                execution_result = await execution_engine.execute(validated_sql)
+                database_context["execution_result"] = execution_result.model_dump()
+
+            memory.per_db_context[database_id] = database_context
 
         # ---------------- Synthesis ----------------
         synthesis = self.synthesis_engine.synthesize(memory.per_db_context)
@@ -124,6 +141,8 @@ class ExecutionController:
         )
 
         return self._build_trace(memory)
+
+    # ---------------- Helpers ----------------
 
     def _transition(self, memory, next_state):
         self.state_machine.validate_transition(memory.current_state, next_state)

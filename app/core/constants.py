@@ -23,3 +23,4 @@ class DatabaseDialect(str, Enum):
     MYSQL = "MYSQL"
     SQLITE = "SQLITE"
     MSSQL = "MSSQL"
+    MONGODB = "MONGODB"

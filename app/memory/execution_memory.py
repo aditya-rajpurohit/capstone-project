@@ -5,13 +5,15 @@ from typing import Any, Optional
 
 class ExecutionMemory:
 
-    def __init__(self, user_query: str,active_db_ids: list[str], max_retries: int) -> None:
+    def __init__(
+        self, user_query: str, active_database_ids: list[str], max_retries: int
+    ) -> None:
         # Core
         self.request_id: str = str(uuid.uuid4())
         self.user_query: str = user_query
         self.created_at: datetime = datetime.now(UTC)
 
-        self.active_db_ids = active_db_ids
+        self.active_database_ids = active_database_ids
 
         # State machine
         self.current_state: Optional[str] = None
@@ -43,6 +45,6 @@ class ExecutionMemory:
         self.risk_penalty: float = 0.0
         self.critic_penalty: float = 0.0
         self.retry_penalty: float = 0.0
-        
+
         self.final_score: Optional[float] = None
         self.final_confidence: Optional[float] = None
