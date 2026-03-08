@@ -5,16 +5,16 @@ from app.orchestration.policy_engine import PolicyEngine
 
 
 def test_reject_non_select():
-    pe = PolicyEngine()
+    policy_engine = PolicyEngine()
 
     with pytest.raises(PolicyViolationError):
-        pe.enforce_readonly("UPDATE users SET x=1;")
+        policy_engine.enforce_readonly("UPDATE users SET x=1;")
 
 
 def test_injects_limit_when_missing():
-    pe = PolicyEngine(auto_limit=100)
+    policy_engine = PolicyEngine(auto_limit=100)
 
-    validation = pe.enforce_readonly("SELECT id FROM users")
+    validation = policy_engine.enforce_readonly("SELECT id FROM users")
 
     assert validation.ok is True
     assert validation.limit_injected is True
@@ -23,9 +23,9 @@ def test_injects_limit_when_missing():
 
 
 def test_allows_limit_under_max():
-    pe = PolicyEngine(max_limit=1000)
+    policy_engine = PolicyEngine(max_limit=1000)
 
-    validation = pe.enforce_readonly("SELECT id FROM users LIMIT 999")
+    validation = policy_engine.enforce_readonly("SELECT id FROM users LIMIT 999")
 
     assert validation.ok is True
     assert validation.limit_injected is False
@@ -34,7 +34,14 @@ def test_allows_limit_under_max():
 
 
 def test_rejects_limit_over_max():
-    pe = PolicyEngine(max_limit=1000)
+    policy_engine = PolicyEngine(max_limit=1000)
 
     with pytest.raises(PolicyViolationError):
-        pe.enforce_readonly("SELECT id FROM users LIMIT 5000")
+        policy_engine.enforce_readonly("SELECT id FROM users LIMIT 5000")
+
+
+def test_policy_engine_blocks_insert():
+    policy_engine = PolicyEngine()
+
+    with pytest.raises(PolicyViolationError):
+        policy_engine.enforce_readonly("INSERT INTO users VALUES (1)")

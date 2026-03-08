@@ -43,4 +43,3 @@ class ExecutionTraceRecord(BaseModel):
     # Optional Debug Metadata
     prompt_hash: Optional[str] = None
     response_hash: Optional[str] = None
-
