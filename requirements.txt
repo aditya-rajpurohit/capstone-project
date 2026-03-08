@@ -10,6 +10,7 @@ structlog
 sqlglot
 cryptography
 pytest
+pytest-env
 pytest-asyncio
 httpx
 black
