@@ -1,14 +1,17 @@
 import datetime
 
+from app.cache.query_cache import QueryCache
 from app.context.agent_context import AgentContext
 from app.context.chat_context import ChatContext
 from app.context.context_builder import ContextBuilder
 from app.core.constants import MAX_REFLECTION_RETRIES, EngineState
 from app.data_source.snapshot_manager import SnapshotManager
 from app.db_registry.database_registry import DatabaseRegistry
+from app.memory.chat_memory import ChatMemory
 from app.memory.execution_memory import ExecutionMemory
 from app.orchestration.policy_engine import PolicyEngine
 from app.orchestration.state_machine import StateMachine
+from app.retrieval.hybrid_retriever import HybridRetriever
 from app.schemas.trace_schema import ExecutionTraceRecord
 from app.strategy.db_router import DBRouter
 from app.tools.execution_engine import ExecutionEngine
@@ -26,6 +29,7 @@ class ExecutionController:
         query_agent,
         reflection_agent,
         critic_agent,
+        retriever: HybridRetriever,
     ):
         self.registry = registry
         self.snapshot_manager = snapshot_manager
@@ -37,9 +41,12 @@ class ExecutionController:
 
         self.state_machine = StateMachine()
         self.synthesis_engine = SynthesisEngine()
+        self.retriever = retriever
+
+        self.query_cache = QueryCache(default_ttl_seconds=300)
 
     async def run(
-        self, user_query: str, chat_context: ChatContext
+        self, user_query: str, chat_context: ChatContext, chat_memory: ChatMemory
     ) -> ExecutionTraceRecord:
 
         memory = ExecutionMemory(
@@ -55,6 +62,15 @@ class ExecutionController:
 
         planner_context = ContextBuilder.build_for_planner(memory)
         planner_output = await self.planner_agent.run(planner_context)
+
+        # Always retrieve schema hits (scoped to active DBs via metadata filter if you stored data_source_id)
+        memory.schema_hits = await self.retriever.retrieve_schema(
+            user_query, top_k=8, metadata_filter=None
+        )
+        # Retrieve past successful traces (examples)
+        memory.trace_hits = await self.retriever.retrieve_trace_examples(
+            user_query, top_k=3, metadata_filter=None
+        )
 
         memory.planner_output = planner_output.model_dump()
         memory.final_confidence = planner_output.confidence
@@ -87,8 +103,17 @@ class ExecutionController:
             database_context["schema"] = schema_context.model_dump()
 
             # ---------------- QUERY ----------------
+            preferred_tables = []
+            for hit in memory.schema_hits:
+                t = hit.metadata.get("table")
+                if t:
+                    preferred_tables.append(str(t))
+
             query_context = ContextBuilder.build_for_query(
-                memory, database_context["schema"]
+                memory,
+                database_id,
+                database_context[database_id]["schema"],
+                preferred_tables,
             )
             query_output = await self.query_agent.run(query_context)
 
@@ -103,9 +128,37 @@ class ExecutionController:
             if validated_sql is None:
                 raise ValueError("ERROR: validated_sql is None.")
 
+            # Build cache key
+            snapshot_version = database_context["snapshot_version"]
+            cache_key = f"{database_id}::{snapshot_version}::{validated_sql}"
+
+            # Check session memory
+            cached = chat_memory.get_query_result(database_id, validated_sql)
+            if cached:
+                database_context["execution_result"] = cached
+                continue
+
+            # Check global cache
+            cached = self.query_cache.get(cache_key)
+            if cached:
+                database_context["execution_result"] = cached
+                chat_memory.store_query_result(database_id, validated_sql, cached)
+                continue
+
             # ---------------- EXECUTION ----------------
             execution_result = await execution_engine.execute(validated_sql)
             database_context["execution_result"] = execution_result.model_dump()
+
+            # Cache only if success
+            if execution_result.status == "success":
+                chat_memory.store_query_result(
+                    database_id, validated_sql, database_context["execution_result"]
+                )
+                self.query_cache.set(
+                    cache_key,
+                    database_context["execution_result"],
+                    database.freshness_ttl_seconds,
+                )
 
             # ---------------- REFLECTION (Per DB) ----------------
             while (
@@ -114,7 +167,9 @@ class ExecutionController:
             ):
                 database_context["retry_count"] += 1
 
-                reflection_context = ContextBuilder.build_for_reflection(memory)
+                reflection_context = ContextBuilder.build_for_reflection(
+                    memory, database_id
+                )
                 reflection_output = await self.reflection_agent.run(reflection_context)
 
                 database_context["generated_sql"] = reflection_output.sql
@@ -127,6 +182,18 @@ class ExecutionController:
 
                 execution_result = await execution_engine.execute(validated_sql)
                 database_context["execution_result"] = execution_result.model_dump()
+
+                if execution_result.status == "success":
+                    cache_key = f"{database_id}::{validated_sql}"
+                    chat_memory.store_query_result(
+                        database_id, validated_sql, database_context["execution_result"]
+                    )
+                    self.query_cache.set(
+                        cache_key,
+                        database_context["execution_result"],
+                        database.freshness_ttl_seconds,
+                    )
+                    break
 
             memory.per_db_context[database_id] = database_context
 

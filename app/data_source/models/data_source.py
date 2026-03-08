@@ -37,6 +37,10 @@ class DataSourceConfigModel(Base):
 
     extra_config: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
+    freshness_ttl_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=300
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.now(timezone.utc), nullable=False
     )

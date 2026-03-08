@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import asyncpg
@@ -9,7 +10,6 @@ from app.tools.db_connector.base_connector import BaseConnector
 class PostgresConnector(BaseConnector):
 
     def __init__(self, dsn: str) -> None:
-        """TODO"""
         self._dsn = dsn
         self._pool: asyncpg.Pool | None = None
         self.dialect = DatabaseDialect.POSTGRES
@@ -24,12 +24,23 @@ class PostgresConnector(BaseConnector):
 
         self._pool = None
 
+    async def health_check(self) -> bool:
+        if not self._pool:
+            return False
+
+        try:
+            async with self._pool.acquire() as connection:
+                await connection.execute("SELECT 1")
+            return True
+        except Exception:
+            return False
+
     async def execute(self, sql: str) -> list[dict[str, Any]]:
         if not self._pool:
             raise RuntimeError("Error: PostgresConnector not connected!")
 
         async with self._pool.acquire() as connection:
-            rows = await connection.fetch(sql)
+            rows = await asyncio.wait_for(connection.fetch(sql), timeout=10)
             return [dict(row) for row in rows]
 
     async def introspect_schema(self) -> list[dict[str, Any]]:

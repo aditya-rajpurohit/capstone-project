@@ -18,6 +18,7 @@ class DataSourceHandle:
     connector: BaseConnector
     is_active: bool = True
     is_healthy: bool = True
+    freshness_ttl_seconds: int = 300
 
 
 class DatabaseRegistry:

@@ -1,50 +1,149 @@
+# import uuid
+# from datetime import UTC, datetime
+# from typing import Any, Optional
+
+# from app.retrieval.types import RetrievalHit
+
+
+# class ExecutionMemory:
+
+#     def __init__(
+#         self, user_query: str, active_database_ids: list[str], max_retries: int
+#     ) -> None:
+#         # Core
+#         self.request_id: str = str(uuid.uuid4())
+#         self.user_query: str = user_query
+#         self.created_at: datetime = datetime.now(UTC)
+
+#         self.active_database_ids = active_database_ids
+
+#         # State machine
+#         self.current_state: Optional[str] = None
+#         self.retry_count: int = 0
+#         self.max_retries: int = max_retries
+#         self.final_state: Optional[str] = None
+
+#         # Per-DB execution state
+#         self.per_db_context: dict[str, dict[str, Any]] = {}
+#         # Synthesis result
+#         self.synthesis_result: Optional[dict[str, Any]] = None
+
+#         # Intelligence outputs
+#         self.planner_output: Optional[dict[str, Any]] = None
+#         self.filtered_schema: Optional[dict[str, Any]] = None
+#         self.generated_sql: Optional[str] = None
+#         self.critic_output: Optional[dict[str, Any]] = None
+#         self.validation_output: Optional[dict[str, Any]] = None
+
+#         # Layer 2: retrieval results
+#         self.schema_hits: list[RetrievalHit] = []
+#         self.trace_hits: list[RetrievalHit] = []
+
+#         # Execution
+#         self.execution_result: Optional[dict[str, Any]] = None
+#         self.execution_latency_ms: Optional[float] = None
+
+#         # Reflection
+#         self.reflection_history: list[dict[str, Any]] = []
+#         self.last_error_message: Optional[str] = None
+
+#         # Evaluation
+#         self.risk_penalty: float = 0.0
+#         self.critic_penalty: float = 0.0
+#         self.retry_penalty: float = 0.0
+
+#         self.final_score: Optional[float] = None
+#         self.final_confidence: Optional[float] = None
+
+
 import uuid
-from datetime import UTC, datetime
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from app.core.constants import EngineState
+from app.retrieval.types import RetrievalHit
 
 
 class ExecutionMemory:
+    """
+    Request-scoped runtime memory.
+
+    - Lives for a single controller.run() call
+    - Owns execution state
+    - Not persisted directly (trace is derived from this)
+    """
 
     def __init__(
-        self, user_query: str, active_database_ids: list[str], max_retries: int
+        self,
+        user_query: str,
+        active_database_ids: list[str],
+        max_retries: int,
     ) -> None:
-        # Core
+
+        # ---- Core ----
         self.request_id: str = str(uuid.uuid4())
         self.user_query: str = user_query
-        self.created_at: datetime = datetime.now(UTC)
+        self.created_at: datetime = datetime.now(timezone.utc)
 
-        self.active_database_ids = active_database_ids
+        self.active_database_ids: list[str] = active_database_ids
 
-        # State machine
-        self.current_state: Optional[str] = None
-        self.retry_count: int = 0
+        # ---- State Machine ----
+        self.current_state: Optional[EngineState] = None
+        self.final_state: Optional[EngineState] = None
+
         self.max_retries: int = max_retries
-        self.final_state: Optional[str] = None
 
-        # Per-DB execution state
-        self.per_db_context: dict[str, dict[str, Any]] = {}
-        # Synthesis result
+        # ---- Global Intelligence Outputs ----
+        self.planner_output: Optional[dict[str, Any]] = None
+        self.final_confidence: Optional[float] = None
+
+        # ---- Retrieval (Layer 2) ----
+        self.schema_hits: list[RetrievalHit] = []
+        self.trace_hits: list[RetrievalHit] = []
+
+        # ---- Per-DB Execution Context ----
+        # db_id -> {
+        #   "schema": dict,
+        #   "generated_sql": str,
+        #   "validation": dict,
+        #   "execution_result": dict,
+        #   "retry_count": int,
+        #   "reflection_history": list[dict],
+        # }
+        self.per_db_context: Dict[str, Dict[str, Any]] = {}
+
+        # ---- Synthesis ----
         self.synthesis_result: Optional[dict[str, Any]] = None
 
-        # Intelligence outputs
-        self.planner_output: Optional[dict[str, Any]] = None
-        self.filtered_schema: Optional[dict[str, Any]] = None
-        self.generated_sql: Optional[str] = None
-        self.critic_output: Optional[dict[str, Any]] = None
-        self.validation_output: Optional[dict[str, Any]] = None
-
-        # Execution
-        self.execution_result: Optional[dict[str, Any]] = None
-        self.execution_latency_ms: Optional[float] = None
-
-        # Reflection
-        self.reflection_history: list[dict[str, Any]] = []
-        self.last_error_message: Optional[str] = None
-
-        # Evaluation
+        # ---- Evaluation ----
         self.risk_penalty: float = 0.0
         self.critic_penalty: float = 0.0
         self.retry_penalty: float = 0.0
-
         self.final_score: Optional[float] = None
-        self.final_confidence: Optional[float] = None
+
+    # ---------------------------------------
+    # Utility helpers
+    # ---------------------------------------
+
+    def init_db_context(self, db_id: str) -> None:
+        """
+        Initialize per-DB execution container.
+        """
+        self.per_db_context[db_id] = {
+            "retry_count": 0,
+            "reflection_history": [],
+        }
+
+    def increment_retry(self, db_id: str) -> None:
+        self.per_db_context[db_id]["retry_count"] += 1
+
+    def add_reflection(self, db_id: str, previous_sql: str, error_message: str) -> None:
+        self.per_db_context[db_id]["reflection_history"].append(
+            {
+                "previous_sql": previous_sql,
+                "error_message": error_message,
+            }
+        )
+
+    def total_retry_count(self) -> int:
+        return sum(ctx.get("retry_count", 0) for ctx in self.per_db_context.values())
