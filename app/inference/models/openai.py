@@ -4,9 +4,7 @@ from typing import Type, cast
 from openai import NOT_GIVEN, AsyncOpenAI
 from openai.types.chat.completion_create_params import ResponseFormat
 from openai.types.shared_params.response_format_json_schema import (
-    JSONSchema,
-    ResponseFormatJSONSchema,
-)
+    JSONSchema, ResponseFormatJSONSchema)
 from pydantic import BaseModel
 
 from app.inference.base import Model

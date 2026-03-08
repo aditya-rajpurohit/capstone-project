@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import desc, select
 
 from app.data_source.models.schema_snapshot import SchemaSnapshotModel
-from app.data_source.session import AsyncSessionLocal
+from app.data_source.session import get_sessionmaker
 
 
 class SnapshotManager:
@@ -25,7 +25,9 @@ class SnapshotManager:
         if data_source_id in self._cache:
             return self._cache[data_source_id]
 
-        async with AsyncSessionLocal() as session:
+        Session = get_sessionmaker()
+
+        async with Session() as session:
             stmt = (
                 select(SchemaSnapshotModel)
                 .where(SchemaSnapshotModel.data_source_id == uuid.UUID(data_source_id))

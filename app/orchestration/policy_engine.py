@@ -1,7 +1,8 @@
 import re
 from dataclasses import dataclass
 
-from app.core.constants import DEFAULT_AUTOLIMIT, MAX_LIMIT_ALLOWED, DatabaseDialect
+from app.core.constants import (DEFAULT_AUTOLIMIT, MAX_LIMIT_ALLOWED,
+                                DatabaseDialect)
 from app.core.exceptions import PolicyViolationError
 from app.schemas.validation_schema import ValidationOutput
 

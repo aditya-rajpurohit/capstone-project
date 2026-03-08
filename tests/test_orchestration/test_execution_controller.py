@@ -12,9 +12,10 @@ from app.context.chat_context import ChatContext
 from app.core.constants import DatabaseDialect, EngineState
 from app.data_source.models.data_source import DataSourceConfigModel
 from app.data_source.models.schema_snapshot import SchemaSnapshotModel
-from app.data_source.session import AsyncSessionLocal
+from app.data_source.session import get_sessionmaker
 from app.data_source.snapshot_manager import SnapshotManager
-from app.db_registry.database_registry import DatabaseRegistry, DataSourceHandle
+from app.db_registry.database_registry import (DatabaseRegistry,
+                                               DataSourceHandle)
 from app.inference.models.openai import OpenAI
 from app.inference.structured import StructuredModel
 from app.orchestration.execution_controller import ExecutionController
@@ -55,7 +56,9 @@ async def test_execution_orchestration():
             "Missing required env vars: TEST_DSN_DB1/DB2, DATABASE_URL, OPENAI_API_KEY"
         )
 
-    async with AsyncSessionLocal() as session:
+    Session = get_sessionmaker()
+
+    async with Session() as session:
         await session.execute(delete(SchemaSnapshotModel))
         await session.execute(delete(DataSourceConfigModel))
         await session.commit()
@@ -94,7 +97,9 @@ async def test_execution_orchestration():
     ds1_id = uuid.uuid4()
     ds2_id = uuid.uuid4()
 
-    async with AsyncSessionLocal() as session:
+    Session = get_sessionmaker()
+
+    async with Session() as session:
         session.add_all(
             [
                 DataSourceConfigModel(
