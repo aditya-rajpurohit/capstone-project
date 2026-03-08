@@ -26,7 +26,8 @@ class ExecutionTraceRecord(BaseModel):
     validation_result: Optional[dict[str, Any]] = None
 
     # Execution Result
-    execution_result: Optional[dict[str, Any]] = None
+    per_db_results: Optional[dict[str, dict]] = None
+    synthesis_result: Optional[dict[str, Any]] = None
     execution_latency_ms: Optional[float] = None
 
     # Reflection History
@@ -42,3 +43,4 @@ class ExecutionTraceRecord(BaseModel):
     # Optional Debug Metadata
     prompt_hash: Optional[str] = None
     response_hash: Optional[str] = None
+

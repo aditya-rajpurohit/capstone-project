@@ -1,275 +1,146 @@
 import datetime
 
-from app.agents.base import BaseAgent
 from app.context.context_builder import ContextBuilder
-from app.core.constants import MAX_REFLECTION_RETRIES, EngineState
-from app.core.exceptions import PolicyViolationError
 from app.memory.execution_memory import ExecutionMemory
-from app.orchestration.policy_engine import PolicyEngine
 from app.orchestration.state_machine import StateMachine
-from app.schemas.execution_schema import ExecutionResult
+from app.orchestration.policy_engine import PolicyEngine
+from app.registry.database_registry import DatabaseRegistry
 from app.schemas.trace_schema import ExecutionTraceRecord
-from app.tools.db_connector.base_connector import BaseConnector
 from app.tools.execution_engine import ExecutionEngine
 from app.tools.schema_transformer import SchemaTransformer
-
-
-def _compute_score(
-    model_confidence: float,
-    validation_result: dict | None,
-    critic_result: dict | None,
-    retry_count: int,
-) -> tuple[float, float, float, float]:
-
-    risk_penalty = 0.0
-    if validation_result:
-        if validation_result.get("risk_level") == "medium":
-            risk_penalty = 0.1
-        elif validation_result.get("risk_level") == "high":
-            risk_penalty = 0.2
-
-    critic_penalty = 0.0
-    if critic_result:
-        if critic_result.get("risk_level") == "medium":
-            critic_penalty = 0.1
-        elif critic_result.get("risk_level") == "high":
-            critic_penalty = 0.2
-
-    retry_penalty = retry_count * 0.05
-
-    final_score = max(
-        0.0,
-        model_confidence - risk_penalty - critic_penalty - retry_penalty,
-    )
-
-    return final_score, risk_penalty, critic_penalty, retry_penalty
+from app.tools.synthesis_engine import SynthesisEngine
+from app.core.constants import EngineState, MAX_REFLECTION_RETRIES
 
 
 class ExecutionController:
-    """
-    Deterministic Orchestrator.
-    Owns execution flow.
-    Owns ExecutionMemory.
-    StateMachine only validates transitions.
-    """
 
     def __init__(
         self,
-        connector: BaseConnector,
-        planner_agent: BaseAgent,
-        query_agent: BaseAgent,
-        reflection_agent: BaseAgent,
-        critic_agent: BaseAgent,
-    ) -> None:
-
-        self.connector = connector
+        registry: DatabaseRegistry,
+        planner_agent,
+        query_agent,
+        reflection_agent,
+        critic_agent,
+    ):
+        self.registry = registry
         self.planner_agent = planner_agent
         self.query_agent = query_agent
         self.reflection_agent = reflection_agent
         self.critic_agent = critic_agent
 
         self.state_machine = StateMachine()
+        self.synthesis_engine = SynthesisEngine()
 
-        self.policy_engine = PolicyEngine(dialect=connector.dialect)
-        self.execution_engine = ExecutionEngine(connector)
-        self.schema_transformer = SchemaTransformer(connector.dialect)
-
-    async def run(self, user_query: str) -> ExecutionTraceRecord:
+    async def run(self, user_query: str, chat_context) -> ExecutionTraceRecord:
 
         memory = ExecutionMemory(
             user_query=user_query,
+            active_db_ids=chat_context.active_db_ids,
             max_retries=MAX_REFLECTION_RETRIES,
         )
 
         memory.current_state = EngineState.INIT
 
-        try:
-            # ---------------- INIT → PLAN ----------------
-            self._transition(memory, EngineState.PLAN)
+        # ---------------- Planner (Global) ----------------
+        self._transition(memory, EngineState.PLAN)
 
-            planner_context = ContextBuilder.build_for_planner(memory)
-            plan_output = await self.planner_agent.run(planner_context)
+        planner_context = ContextBuilder.build_for_planner(memory)
+        planner_output = await self.planner_agent.run(planner_context)
+        memory.planner_output = planner_output.model_dump()
+        memory.final_confidence = planner_output.confidence
 
-            memory.planner_output = plan_output.model_dump()
+        # ---------------- Per-DB Execution ----------------
+        for db_id in memory.active_db_ids:
 
-            # ---------------- PLAN → SCHEMA_RETRIEVAL ----------------
-            self._transition(memory, EngineState.SCHEMA_RETRIEVAL)
+            db_unit = self.registry.get(db_id)
+            if not db_unit:
+                continue
 
-            raw_schema = await self.connector.introspect_schema()
-            schema_context = self.schema_transformer.transform(raw_schema)
+            connector = db_unit.connector
+            policy = PolicyEngine(dialect=connector.dialect)
+            execution_engine = ExecutionEngine(connector)
+            transformer = SchemaTransformer(connector.dialect)
 
-            memory.filtered_schema = schema_context.model_dump()
+            db_ctx = {
+                "retry_count": 0,
+                "reflection_history": [],
+            }
 
-            # ---------------- SCHEMA → QUERY_GENERATION ----------------
-            self._transition(memory, EngineState.QUERY_GENERATION)
+            # SCHEMA
+            raw_schema = await connector.introspect_schema()
+            schema_context = transformer.transform(raw_schema)
+            db_ctx["schema"] = schema_context.model_dump()
 
+            # QUERY
             query_context = ContextBuilder.build_for_query(memory)
             query_output = await self.query_agent.run(query_context)
 
-            memory.generated_sql = query_output.sql
-            memory.confidence = query_output.confidence
+            db_ctx["generated_sql"] = query_output.sql
 
-            # ---------------- CRITIC ----------------
-            critic_context = ContextBuilder.build_for_query(memory)
-            critic_context.previous_sql = memory.generated_sql
-
-            critic_output = await self.critic_agent.run(critic_context)
-            memory.critic_output = critic_output.model_dump()
-
-            # ---------------- VALIDATION ----------------
-            self._transition(memory, EngineState.VALIDATION)
-
-            if memory.generated_sql is None:
-                raise ValueError("Error: generated_sql is None!")
-
-            validation = self.policy_engine.enforce_readonly(memory.generated_sql)
-            memory.validation_output = validation.model_dump()
-
+            # VALIDATION
+            validation = policy.enforce_readonly(query_output.sql)
+            db_ctx["validation"] = validation.model_dump()
             validated_sql = validation.normalized_sql
 
-            # ---------------- EXECUTION ----------------
-            self._transition(memory, EngineState.EXECUTION)
-
+            # EXECUTION
             if validated_sql is None:
-                raise ValueError("Error: validated_sql is None!")
+                raise ValueError("ERROR: validated_sql is None!")
+            execution_result = await execution_engine.execute(validated_sql)
+            db_ctx["execution_result"] = execution_result.model_dump()
 
-            execution_result: ExecutionResult = await self.execution_engine.execute(
-                validated_sql
-            )
-
-            memory.execution_result = execution_result.model_dump()
-            memory.execution_latency_ms = execution_result.elapsed_ms
-
-            if execution_result.status == "success":
-                self._transition(memory, EngineState.DONE)
-                memory.final_state = EngineState.DONE
-                return self._build_trace(memory)
-
-            # ---------------- REFLECTION LOOP ----------------
-            while execution_result.status != "success":
-
-                memory.retry_count += 1
-
-                if memory.retry_count > memory.max_retries:
-                    self._transition(memory, EngineState.FAILED)
-                    memory.final_state = EngineState.FAILED
-                    return self._build_trace(memory)
-
-                self._transition(memory, EngineState.REFLECTION)
-
-                memory.last_error_message = (
-                    execution_result.error_message or "Unknown execution error"
-                )
-
-                memory.reflection_history.append(
-                    {
-                        "previous_sql": memory.generated_sql,
-                        "error_message": memory.last_error_message,
-                    }
-                )
-
-                # REFLECTION → QUERY_GENERATION
-                self._transition(memory, EngineState.QUERY_GENERATION)
+            # Reflection per DB
+            while (
+                execution_result.status != "success"
+                and db_ctx["retry_count"] < memory.max_retries
+            ):
+                db_ctx["retry_count"] += 1
 
                 reflection_context = ContextBuilder.build_for_reflection(memory)
-                query_output = await self.reflection_agent.run(reflection_context)
+                reflection_output = await self.reflection_agent.run(
+                    reflection_context
+                )
 
-                memory.generated_sql = query_output.sql
-                memory.confidence = query_output.confidence
+                db_ctx["generated_sql"] = reflection_output.sql
 
-                # CRITIC
-                critic_context = ContextBuilder.build_for_query(memory)
-                critic_context.previous_sql = memory.generated_sql
-
-                critic_output = await self.critic_agent.run(critic_context)
-                memory.critic_output = critic_output.model_dump()
-
-                # VALIDATION
-                self._transition(memory, EngineState.VALIDATION)
-
-                if memory.generated_sql is None:
-                    raise ValueError("Error: generated_sql is None!")
-
-                validation = self.policy_engine.enforce_readonly(memory.generated_sql)
-                memory.validation_output = validation.model_dump()
-
+                validation = policy.enforce_readonly(reflection_output.sql)
                 validated_sql = validation.normalized_sql
-                memory.reflection_history[-1]["corrected_sql"] = validated_sql
-
-                # EXECUTION
-                self._transition(memory, EngineState.EXECUTION)
 
                 if validated_sql is None:
-                    raise ValueError("Error: validated_sql is None!")
+                    raise ValueError("ERROR: validated_sql is None!")
+                
+                execution_result = await execution_engine.execute(validated_sql)
+                db_ctx["execution_result"] = execution_result.model_dump()
 
-                execution_result = await self.execution_engine.execute(validated_sql)
-                memory.execution_result = execution_result.model_dump()
-                memory.execution_latency_ms = execution_result.elapsed_ms
+            memory.per_db_context[db_id] = db_ctx
 
-                if execution_result.status == "success":
-                    self._transition(memory, EngineState.DONE)
-                    memory.final_state = EngineState.DONE
-                    return self._build_trace(memory)
+        # ---------------- Synthesis ----------------
+        synthesis = self.synthesis_engine.synthesize(memory.per_db_context)
+        memory.synthesis_result = synthesis
 
-            # Fallback
-            self._transition(memory, EngineState.FAILED)
-            memory.final_state = EngineState.FAILED
-            return self._build_trace(memory)
-
-        except PolicyViolationError as e:
-            memory.final_state = EngineState.FAILED
-            memory.execution_result = {
-                "status": "failed",
-                "error_type": "policy_violation",
-                "error_message": str(e),
-            }
-            return self._build_trace(memory)
-
-        except Exception as e:
-            memory.final_state = EngineState.FAILED
-            memory.execution_result = {
-                "status": "failed",
-                "error_type": "controller_error",
-                "error_message": str(e),
-            }
-            return self._build_trace(memory)
-
-    # ---------------- INTERNAL HELPERS ----------------
-
-    def _transition(self, memory: ExecutionMemory, next_state: EngineState):
-        self.state_machine.validate_transition(
-            EngineState(memory.current_state), next_state
+        memory.final_state = (
+            EngineState.DONE
+            if synthesis.get("status") == "success"
+            else EngineState.FAILED
         )
+
+        return self._build_trace(memory)
+
+    def _transition(self, memory, next_state):
+        self.state_machine.validate_transition(memory.current_state, next_state)
         memory.current_state = next_state
 
-    def _build_trace(self, memory: ExecutionMemory) -> ExecutionTraceRecord:
-
-        final_score, risk_penalty, critic_penalty, retry_penalty = _compute_score(
-            model_confidence=memory.confidence or 0.0,
-            validation_result=memory.validation_output,
-            critic_result=memory.critic_output,
-            retry_count=memory.retry_count,
-        )
+    def _build_trace(self, memory):
 
         return ExecutionTraceRecord(
             request_id=memory.request_id,
             user_query=memory.user_query,
             timestamp_iso=datetime.datetime.now(datetime.UTC).isoformat(),
-            final_state=EngineState(memory.final_state),
-            retry_count=memory.retry_count,
-            plan=memory.planner_output,
-            filtered_schema=memory.filtered_schema,
-            generated_query=(
-                {"sql": memory.generated_sql} if memory.generated_sql else None
+            final_state=memory.final_state,
+            retry_count=sum(
+                ctx["retry_count"] for ctx in memory.per_db_context.values()
             ),
-            critic_result=memory.critic_output,
-            validation_result=memory.validation_output,
-            execution_result=memory.execution_result,
-            execution_latency_ms=memory.execution_latency_ms,
-            reflection_history=memory.reflection_history,
-            final_confidence=memory.confidence,
-            risk_penalty=risk_penalty,
-            critic_penalty=critic_penalty,
-            retry_penalty=retry_penalty,
-            final_score=final_score,
+            plan=memory.planner_output,
+            per_db_results=memory.per_db_context,
+            synthesis_result=memory.synthesis_result,
+            final_confidence=memory.final_confidence,
         )
