@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
-from app.retrieval.backend import RetrievalBackend
-from app.retrieval.types import RetrievalHit, RetrievalQuery
+from app.retrieval.retrieval_backend import RetrievalBackend
+from app.retrieval.retrieval_types import RetrievalHit, RetrievalQuery
 
 
 class HybridRetriever:
@@ -14,7 +14,7 @@ class HybridRetriever:
     def __init__(self, backend: RetrievalBackend) -> None:
         self.backend = backend
 
-    async def retrieve_schema(
+    async def retrieve_schema_hits(
         self,
         user_query: str,
         *,
@@ -30,7 +30,7 @@ class HybridRetriever:
             )
         )
 
-    async def retrieve_trace_examples(
+    async def retrieve_trace_hits(
         self,
         user_query: str,
         *,

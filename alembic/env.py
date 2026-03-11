@@ -1,7 +1,9 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 from logging.config import fileConfig
 
@@ -9,8 +11,10 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from app.config import DATABASE_URL
-from app.data_source.base import Base
-from app.data_source.models import DataSourceConfigModel, SchemaSnapshotModel
+from app.database.metadata.models.base import Base
+import app.database.metadata.models
+import app.runtime.models
+import app.retrieval.embedding_models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
