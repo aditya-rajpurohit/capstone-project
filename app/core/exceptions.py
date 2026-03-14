@@ -14,5 +14,5 @@ class PolicyViolationError(AgenticEngineError):
     """Raised when SQL violates enforced safety policy"""
 
 
-class ExecutionError(AgenticEngineError):
+class DataSourceExecutionError(AgenticEngineError):
     """Raised for DB execution failures (later used in Phase 2)"""

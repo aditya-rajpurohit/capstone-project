@@ -20,3 +20,4 @@ openai
 anthropic
 google-genai
 greenlet
+pgvector
