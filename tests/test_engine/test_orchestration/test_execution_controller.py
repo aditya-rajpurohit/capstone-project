@@ -4,22 +4,21 @@ import uuid
 import pytest
 from sqlalchemy import delete
 
-from app.agents.critic import CriticAgent
-from app.agents.planner import PlannerAgent
-from app.agents.query import QueryAgent
-from app.agents.reflection import ReflectionAgent
-from app.context.chat_context import ChatContext
+from app.engine.agents.critic_agent import CriticAgent
+from app.engine.agents.planner_agent import PlannerAgent
+from app.engine.agents.query_agent import QueryAgent
+from app.engine.agents.reflection_agent import ReflectionAgent
+from app.engine.context.chat_context import ChatContext
 from app.core.constants import DatabaseDialect, EngineState
-from app.data_source.models.data_source import DataSourceConfigModel
-from app.data_source.models.schema_snapshot import SchemaSnapshotModel
-from app.data_source.session import get_async_session
-from app.data_source.snapshot_manager import SnapshotManager
-from app.db_registry.database_registry import (DatabaseRegistry,
-                                               DataSourceHandle)
-from app.inference.models.openai import OpenAI
-from app.inference.structured import StructuredModel
-from app.orchestration.execution_controller import ExecutionController
-from app.tools.db_connector.postgres_connector import PostgresConnector
+from app.database.metadata.models.data_source import DataSourceConfigModel
+from app.database.metadata.models.schema_snapshot import SchemaSnapshotModel
+from app.database.metadata.session import get_async_session
+from app.database.metadata.snapshot_manager import SnapshotManager
+from app.database.registry.database_registry import DatabaseRegistry, DataSourceHandle
+from app.engine.inference.models.openai import OpenAI
+from app.engine.inference.structured_model import StructuredModel
+from app.engine.orchestration.execution_controller import ExecutionController
+from app.database.connector.postgres_connector import PostgresConnector
 
 pytestmark = pytest.mark.integration
 
