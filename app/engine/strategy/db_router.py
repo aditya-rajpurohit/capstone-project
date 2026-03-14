@@ -1,5 +1,4 @@
 import re
-
 from app.database.registry.database_registry import DatabaseRegistry
 
 class DBRouter:

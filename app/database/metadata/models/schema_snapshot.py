@@ -14,7 +14,7 @@ class SchemaSnapshotModel(Base):
     """
 
     __tablename__ = "schema_snapshots"
-    __table_args__ = (UniqueConstraint("data_source_id", "version", name="uq_schema_snapshot_source_version"))
+    __table_args__ = (UniqueConstraint("data_source_id", "version", name="uq_schema_snapshot_source_version"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 

@@ -13,7 +13,7 @@ from alembic import context
 from app.config import DATABASE_URL
 from app.database.metadata.models.base import Base
 import app.database.metadata.models
-import app.runtime.models
+import app.runtime.chat_model
 import app.retrieval.embedding_models
 
 # this is the Alembic Config object, which provides

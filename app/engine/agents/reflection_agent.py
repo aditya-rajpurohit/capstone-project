@@ -1,4 +1,4 @@
-from app.engine.agents.base_agents import BaseAgent
+from app.engine.agents.base_agent import BaseAgent
 from app.engine.context.agent_context import AgentContext
 from app.engine.inference.structured_model import StructuredModel
 from app.engine.inference.types import ModelRequest
@@ -24,7 +24,7 @@ class ReflectionAgent(BaseAgent):
         self.model = model
         self.model_name = model_name
 
-    async def run(self, context: AgentContext) -> QueryOutput:
+    async def run(self, context: AgentContext) -> QueryOutput | str:
 
         user_prompt = f"""
             Plan: {context.plan}
