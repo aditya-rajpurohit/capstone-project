@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Type, Optional
+from typing import Optional, Type
 
 from pydantic import BaseModel
 
@@ -13,5 +13,6 @@ class Model(ABC):
     """
 
     @abstractmethod
-    async def generate(self, request: ModelRequest, schema: Optional[Type[BaseModel]] = None) -> ModelResponse: 
-        ...
+    async def generate(
+        self, request: ModelRequest, schema: Optional[Type[BaseModel]] = None
+    ) -> ModelResponse: ...

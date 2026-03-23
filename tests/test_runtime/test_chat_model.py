@@ -14,10 +14,7 @@ def test_chat_session_model_creation():
 
 
 def test_chat_session_model_defaults():
-    session = ChatSessionModel(
-        session_id="test-session",
-        turns=[]
-    )
+    session = ChatSessionModel(session_id="test-session", turns=[])
 
     # DB defaults are not populated until insert
     assert session.id is None

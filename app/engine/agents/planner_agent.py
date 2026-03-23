@@ -1,9 +1,8 @@
 from app.engine.agents.base_agent import BaseAgent
 from app.engine.context.agent_context import AgentContext
+from app.engine.contracts.planner_contract import PlannerOutput
 from app.engine.inference.structured_model import StructuredModel
 from app.engine.inference.types import ModelRequest
-from app.engine.contracts.planner_contract import PlannerOutput
-
 
 PLANNER_SYSTEM_PROMPT = """
     You are a SQL planning assistant.
@@ -29,7 +28,7 @@ class PlannerAgent(BaseAgent):
 
     async def run(self, context: AgentContext) -> PlannerOutput | str:
         user_prompt = f"User request:\n{context.user_query}"
-        
+
         request = ModelRequest(
             system_prompt=PLANNER_SYSTEM_PROMPT,
             user_prompt=user_prompt,

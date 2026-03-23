@@ -1,7 +1,9 @@
 from unittest.mock import MagicMock
-from app.engine.strategy.db_router import DBRouter
-from app.database.registry.database_registry import DatabaseRegistry, DataSourceHandle
+
 from app.core.constants import DatabaseDialect
+from app.database.registry.database_registry import (DatabaseRegistry,
+                                                     DataSourceHandle)
+from app.engine.strategy.db_router import DBRouter
 
 
 def build_registry():

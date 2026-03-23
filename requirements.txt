@@ -21,3 +21,14 @@ anthropic
 google-genai
 greenlet
 pgvector
+aiomysql
+aiosqlite
+motor
+aioboto3
+neo4j
+redis
+cassandra-driver
+snowflake-connector-python
+google-cloud-bigquery
+clickhouse-connect
+duckdb

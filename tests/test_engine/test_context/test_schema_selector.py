@@ -19,9 +19,7 @@ def test_schema_selector_filters_relevant_tables():
     }
 
     filtered = SchemaSelector.select(
-        snapshot,
-        "Show names of users",
-        preferred_tables=[]
+        snapshot, "Show names of users", preferred_tables=[]
     )
 
     table_names = [t["name"] for t in filtered["tables"]]
@@ -39,21 +37,13 @@ def test_schema_selector_no_match_returns_tables():
         ]
     }
 
-    filtered = SchemaSelector.select(
-        snapshot,
-        "random query",
-        preferred_tables=[]
-    )
+    filtered = SchemaSelector.select(snapshot, "random query", preferred_tables=[])
 
     assert len(filtered["tables"]) > 0
 
 
 def test_schema_selector_empty_schema():
 
-    filtered = SchemaSelector.select(
-        {},
-        "anything",
-        preferred_tables=[]
-    )
+    filtered = SchemaSelector.select({}, "anything", preferred_tables=[])
 
     assert filtered == {"tables": []}

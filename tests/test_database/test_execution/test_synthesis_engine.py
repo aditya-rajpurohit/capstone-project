@@ -1,7 +1,6 @@
 from app.database.execution.synthesis_engine import SynthesisEngine
 
 
-
 def test_synthesis_engine_multiple_success():
     per_db = {
         "db1": {

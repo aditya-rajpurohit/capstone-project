@@ -1,6 +1,8 @@
 # RUN THIS
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from app.database.metadata.snapshot_refresher import SnapshotRefresher
 
 

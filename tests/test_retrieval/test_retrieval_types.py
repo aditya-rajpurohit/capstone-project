@@ -1,4 +1,5 @@
-from app.retrieval.retrieval_types import RetrievalDocument, RetrievalHit, RetrievalQuery
+from app.retrieval.retrieval_types import (RetrievalDocument, RetrievalHit,
+                                           RetrievalQuery)
 
 
 def test_retrieval_document():

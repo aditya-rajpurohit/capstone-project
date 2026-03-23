@@ -17,7 +17,9 @@ class Gemini(Model):
             raise ValueError("Error: GEMINI_API_KEY not assigned!")
         self.client = genai.Client(api_key=_KEY)
 
-    async def generate(self, request: ModelRequest, schema: Type[BaseModel] | None = None) -> ModelResponse:
+    async def generate(
+        self, request: ModelRequest, schema: Type[BaseModel] | None = None
+    ) -> ModelResponse:
 
         response = await self.client.aio.models.generate_content(
             model=request.model,

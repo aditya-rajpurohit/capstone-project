@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.runtime.chat.chat_store import ChatStore
+
+import pytest
+
 from app.runtime.chat.chat_memory import ChatMemory
+from app.runtime.chat.chat_store import ChatStore
 
 
 @pytest.mark.asyncio
@@ -14,7 +16,9 @@ async def test_load_returns_empty_memory_if_not_found():
     SessionMock = MagicMock()
     SessionMock.return_value.__aenter__.return_value = session
 
-    with patch("app.runtime.chat.chat_store.get_async_session", return_value=SessionMock):
+    with patch(
+        "app.runtime.chat.chat_store.get_async_session", return_value=SessionMock
+    ):
 
         mem = await store.load("s1")
 
@@ -34,7 +38,9 @@ async def test_save_creates_new_row():
     SessionMock = MagicMock()
     SessionMock.return_value.__aenter__.return_value = session
 
-    with patch("app.runtime.chat.chat_store.get_async_session", return_value=SessionMock):
+    with patch(
+        "app.runtime.chat.chat_store.get_async_session", return_value=SessionMock
+    ):
 
         await store.save(mem)
 

@@ -1,7 +1,7 @@
 import pytest
 
 from app.core.exceptions import PolicyViolationError
-from app.engine.orchestration.policy_engine import SqlPolicyEngine
+from app.evals.guardrails.policy_engine import SqlPolicyEngine
 
 
 def test_reject_non_select():

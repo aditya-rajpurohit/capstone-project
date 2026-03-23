@@ -1,4 +1,5 @@
-from app.core.constants import EngineState, DatabaseDialect
+from app.core.constants import DatabaseDialect, EngineState
+
 
 def test_engine_state_enum():
     assert EngineState.INIT.value == "INIT"

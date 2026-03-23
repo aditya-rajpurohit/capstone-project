@@ -1,11 +1,15 @@
 from typing import Any
+
 from app.core.constants import DatabaseDialect
-from app.engine.contracts.schema_context_contract import (SchemaContext, TableInfo, ColumnInfo, ForeignKeyInfo)
+from app.engine.contracts.schema_context_contract import (ColumnInfo,
+                                                          ForeignKeyInfo,
+                                                          SchemaContext,
+                                                          TableInfo)
 
 
 class SchemaTransformer:
     """Deterministic transformation: Raw DB snapshot → Structured SchemaContext model"""
-    
+
     def __init__(self, dialect: DatabaseDialect) -> None:
         self.dialect = dialect
 

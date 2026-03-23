@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from app.database.registry.database_registry import DatabaseRegistry, DataSourceHandle
+
+import pytest
+
 from app.core.constants import DatabaseDialect
+from app.database.registry.database_registry import (DatabaseRegistry,
+                                                     DataSourceHandle)
 
 
 def test_database_registry_singleton():

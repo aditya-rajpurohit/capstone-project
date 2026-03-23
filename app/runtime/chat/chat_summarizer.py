@@ -1,7 +1,6 @@
 from app.engine.inference.structured_model import StructuredModel
 from app.engine.inference.types import ModelRequest
 
-
 SUMMARY_SYSTEM_PROMPT = """You are a summarizer.
 Summarize the conversation so far into a compact memory that preserves:
 - user goals and constraints

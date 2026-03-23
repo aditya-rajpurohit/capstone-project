@@ -1,6 +1,8 @@
 # RUN THIS
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from app.database.metadata.snapshot_manager import SnapshotManager
 
 
@@ -34,10 +36,14 @@ async def test_get_snapshot_db_fetch():
 
     snapshot_manager = SnapshotManager(sessionmaker=sessionmaker)
 
-    snapshot = await snapshot_manager.get_snapshot("12345678-1234-5678-1234-567812345678")
+    snapshot = await snapshot_manager.get_snapshot(
+        "12345678-1234-5678-1234-567812345678"
+    )
 
     assert snapshot == fake_snapshot
-    assert snapshot_manager._cache["12345678-1234-5678-1234-567812345678"] == fake_snapshot
+    assert (
+        snapshot_manager._cache["12345678-1234-5678-1234-567812345678"] == fake_snapshot
+    )
 
 
 @pytest.mark.asyncio

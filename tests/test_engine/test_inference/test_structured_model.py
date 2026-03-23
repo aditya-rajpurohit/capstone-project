@@ -1,9 +1,13 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 from pydantic import BaseModel
-from app.engine.inference.structured_model import StructuredModel, _extract_json, _validate_contract
-from app.engine.inference.types import ModelRequest, ModelResponse
+
 from app.core.exceptions import ContractValidationError
+from app.engine.inference.structured_model import (StructuredModel,
+                                                   _extract_json,
+                                                   _validate_contract)
+from app.engine.inference.types import ModelRequest, ModelResponse
 
 
 class DummySchema(BaseModel):

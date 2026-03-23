@@ -9,12 +9,12 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
+import app.database.metadata.models
+import app.retrieval.embedding_models
+import app.runtime.chat_model
 from alembic import context
 from app.config import DATABASE_URL
 from app.database.metadata.models.base import Base
-import app.database.metadata.models
-import app.runtime.chat_model
-import app.retrieval.embedding_models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

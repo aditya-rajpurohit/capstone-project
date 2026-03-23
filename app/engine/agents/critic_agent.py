@@ -1,10 +1,10 @@
-from app.engine.agents.base_agent import BaseAgent
-from app.engine.context.agent_context import AgentContext
-from app.engine.inference.structured_model import StructuredModel
-from app.engine.inference.types import ModelRequest
-from app.engine.contracts.critic_contract import CriticOutput
 import json
 
+from app.engine.agents.base_agent import BaseAgent
+from app.engine.context.agent_context import AgentContext
+from app.engine.contracts.critic_contract import CriticOutput
+from app.engine.inference.structured_model import StructuredModel
+from app.engine.inference.types import ModelRequest
 
 CRITIC_SYSTEM_PROMPT = """
     You are a SQL review assistant.

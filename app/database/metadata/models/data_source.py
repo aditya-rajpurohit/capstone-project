@@ -17,7 +17,9 @@ class DataSourceConfigModel(Base):
 
     __tablename__ = "data_sources"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
 
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
@@ -33,7 +35,9 @@ class DataSourceConfigModel(Base):
 
     extra_config: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
-    freshness_ttl_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
+    freshness_ttl_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=300
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

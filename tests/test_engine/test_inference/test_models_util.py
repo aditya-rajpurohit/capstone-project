@@ -1,5 +1,6 @@
 from app.engine.inference.models_util import openai_schema
 
+
 def test_openai_schema_enforces_required_and_additional_properties():
     schema = {
         "type": "object",
@@ -18,16 +19,9 @@ def test_openai_schema_enforces_required_and_additional_properties():
 def test_openai_schema_resolves_refs():
     schema = {
         "type": "object",
-        "properties": {
-            "item": {"$ref": "#/$defs/Item"}
-        },
+        "properties": {"item": {"$ref": "#/$defs/Item"}},
         "$defs": {
-            "Item": {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer"}
-                }
-            }
+            "Item": {"type": "object", "properties": {"id": {"type": "integer"}}}
         },
     }
 
@@ -47,9 +41,7 @@ def test_openai_schema_enforces_array_items():
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "properties": {
-                        "id": {"type": "integer"}
-                    },
+                    "properties": {"id": {"type": "integer"}},
                 },
             }
         },

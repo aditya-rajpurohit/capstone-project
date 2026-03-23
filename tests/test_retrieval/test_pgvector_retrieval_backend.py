@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from app.retrieval.pgvector_retrieval_backend import PgvectorBackend
 from app.retrieval.retrieval_types import RetrievalQuery

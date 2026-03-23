@@ -1,9 +1,10 @@
-import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-from app.database.execution.execution_engine import ExecutionEngine
+import pytest
+
 from app.core.exceptions import DataSourceExecutionError
+from app.database.execution.execution_engine import ExecutionEngine
 
 
 @pytest.mark.asyncio
@@ -29,7 +30,7 @@ async def test_execute_timeout():
 
     with patch(
         "app.database.execution.execution_engine.asyncio.wait_for",
-        new=AsyncMock(side_effect=asyncio.TimeoutError)
+        new=AsyncMock(side_effect=asyncio.TimeoutError),
     ):
         result = await engine.execute("SELECT 1")
 

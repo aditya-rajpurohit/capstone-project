@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
+
 from app.runtime.chat.chat_summarizer import ChatSummarizer
 
 

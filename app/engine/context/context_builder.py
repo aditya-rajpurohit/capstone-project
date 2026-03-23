@@ -15,17 +15,20 @@ class ContextBuilder:
         return AgentContext(user_query=memory.user_query)
 
     @staticmethod
-    def build_for_query(memory: ExecutionMemory, db_id: str, schema: dict[str, Any]) -> AgentContext:
+    def build_for_query(
+        memory: ExecutionMemory, db_id: str, schema: dict[str, Any]
+    ) -> AgentContext:
         # Use schema hits to bias selection
         preferred_tables = [
             hit.metadata.get("table")
             for hit in memory.schema_hits
-            if hit.metadata.get("data_source_id") == db_id
-            and hit.metadata.get("table")
+            if hit.metadata.get("data_source_id") == db_id and hit.metadata.get("table")
         ]
 
         # Apply schema selector
-        filtered = SchemaSelector.select(schema, memory.user_query, preferred_tables=preferred_tables)
+        filtered = SchemaSelector.select(
+            schema, memory.user_query, preferred_tables=preferred_tables
+        )
 
         return AgentContext(
             user_query=memory.user_query,

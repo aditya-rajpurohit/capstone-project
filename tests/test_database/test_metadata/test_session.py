@@ -1,5 +1,7 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 import app.database.metadata.session as session_module
 
 
@@ -17,8 +19,11 @@ def test_get_async_session_creates_sessionmaker(monkeypatch):
     fake_engine = MagicMock()
     fake_sessionmaker = MagicMock()
 
-    with patch.object(session_module, "create_async_engine", return_value=fake_engine), \
-         patch.object(session_module, "async_sessionmaker", return_value=fake_sessionmaker):
+    with patch.object(
+        session_module, "create_async_engine", return_value=fake_engine
+    ), patch.object(
+        session_module, "async_sessionmaker", return_value=fake_sessionmaker
+    ):
 
         session_module._sessionmaker = None
 

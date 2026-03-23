@@ -1,5 +1,5 @@
-from app.engine.contracts.trace_schema import ExecutionTraceRecord
 from app.core.constants import EngineState
+from app.engine.contracts.trace_schema import ExecutionTraceRecord
 
 
 def test_execution_trace_record():

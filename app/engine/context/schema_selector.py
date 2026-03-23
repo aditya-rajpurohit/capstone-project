@@ -78,7 +78,7 @@ class SchemaSelector:
           - If True and no tables match, return first N tables (bounded) to avoid empty schema.
           - If False and no tables match, return {"tables": []}.
         """
-        
+
         if not schema_snapshot or "tables" not in schema_snapshot:
             return {"tables": []}
 

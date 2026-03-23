@@ -1,15 +1,19 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.database.connector.postgres_connector import PostgresConnector
+import pytest
+
 from app.core.exceptions import DataSourceExecutionError
+from app.database.connectors.postgres_connector import PostgresConnector
 
 
 @pytest.mark.asyncio
 async def test_connect_creates_pool():
     connector = PostgresConnector("dsn")
 
-    with patch("app.database.connector.postgres_connector.asyncpg.create_pool", new_callable=AsyncMock) as mock_pool:
+    with patch(
+        "app.database.connectors.postgres_connector.asyncpg.create_pool",
+        new_callable=AsyncMock,
+    ) as mock_pool:
         await connector.connect()
 
         mock_pool.assert_called_once_with(dsn="dsn")
@@ -21,9 +25,9 @@ async def test_close_closes_pool():
     connector = PostgresConnector("dsn")
     pool = AsyncMock()
     connector._pool = pool
-    
+
     await connector.close()
-    
+
     pool.close.assert_awaited_once()
     assert connector._pool is None
 
@@ -113,16 +117,18 @@ async def test_introspect_schema():
 
     connection = AsyncMock()
 
-    connection.fetch = AsyncMock(side_effect=[
-        [{"table_name": "users"}],  # tables
-        [
-            {"column_name": "id", "data_type": "integer", "is_nullable": "NO"},
-            {"column_name": "name", "data_type": "text", "is_nullable": "YES"},
-        ],  # columns
-        [
-            {"column_name": "role_id", "ref_table": "roles", "ref_column": "id"}
-        ],  # foreign keys
-    ])
+    connection.fetch = AsyncMock(
+        side_effect=[
+            [{"table_name": "users"}],  # tables
+            [
+                {"column_name": "id", "data_type": "integer", "is_nullable": "NO"},
+                {"column_name": "name", "data_type": "text", "is_nullable": "YES"},
+            ],  # columns
+            [
+                {"column_name": "role_id", "ref_table": "roles", "ref_column": "id"}
+            ],  # foreign keys
+        ]
+    )
 
     pool = MagicMock()
     pool.acquire.return_value.__aenter__.return_value = connection

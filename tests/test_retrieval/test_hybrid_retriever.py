@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from app.retrieval.hybrid_retriever import HybridRetriever
 from app.retrieval.retrieval_types import RetrievalHit

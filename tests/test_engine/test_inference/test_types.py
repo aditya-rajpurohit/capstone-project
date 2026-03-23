@@ -1,5 +1,6 @@
 from app.engine.inference.types import ModelRequest, ModelResponse
 
+
 def test_model_request_defaults():
     request = ModelRequest(system_prompt="sys", user_prompt="user", model="gpt")
 

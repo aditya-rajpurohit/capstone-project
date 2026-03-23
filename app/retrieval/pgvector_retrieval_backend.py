@@ -1,11 +1,14 @@
 from typing import Any
+
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from app.retrieval.retrieval_backend import RetrievalBackend
-from app.retrieval.embedding_interface import Embedder
-from app.retrieval.retrieval_types import RetrievalDocument, RetrievalHit, RetrievalIndex, RetrievalQuery
-from app.retrieval.embedding_models import EmbeddingRecord
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from app.database.metadata.session import get_async_session
+from app.retrieval.embedding_interface import Embedder
+from app.retrieval.embedding_models import EmbeddingRecord
+from app.retrieval.retrieval_backend import RetrievalBackend
+from app.retrieval.retrieval_types import (RetrievalDocument, RetrievalHit,
+                                           RetrievalIndex, RetrievalQuery)
 
 
 class PgvectorBackend(RetrievalBackend):
@@ -15,6 +18,7 @@ class PgvectorBackend(RetrievalBackend):
     - Upsert by doc_id
     - Search by cosine distance (pgvector operator)
     """
+
     def __init__(
         self,
         embedder: Embedder,
@@ -25,12 +29,13 @@ class PgvectorBackend(RetrievalBackend):
         self.embedding_dim = embedding_dim
         self._Session = sessionmaker or get_async_session()
 
-
     async def upsert(self, retrieval_documents: list[RetrievalDocument]) -> None:
         if not retrieval_documents:
             return
 
-        embeddings = await self.embedder.embed([doc.text for doc in retrieval_documents])
+        embeddings = await self.embedder.embed(
+            [doc.text for doc in retrieval_documents]
+        )
 
         Session = get_async_session()
 
@@ -57,7 +62,6 @@ class PgvectorBackend(RetrievalBackend):
                     )
             await session.commit()
 
-
     async def search(self, retrieval_query: RetrievalQuery) -> list[RetrievalHit]:
         q_embedding = (await self.embedder.embed([retrieval_query.query_text]))[0]
 
@@ -71,9 +75,7 @@ class PgvectorBackend(RetrievalBackend):
 
             if retrieval_query.metadata_filter:
                 for k, v in retrieval_query.metadata_filter.items():
-                    stmt = stmt.where(
-                        EmbeddingRecord.meta_data[k].astext == str(v)
-                    )
+                    stmt = stmt.where(EmbeddingRecord.meta_data[k].astext == str(v))
 
             stmt = stmt.order_by(
                 EmbeddingRecord.embedding.cosine_distance(q_embedding)
