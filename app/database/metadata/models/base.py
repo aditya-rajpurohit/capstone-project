@@ -5,4 +5,5 @@ class Base(DeclarativeBase):
     """
     Declarative base for App DB models.
     """
+
     pass

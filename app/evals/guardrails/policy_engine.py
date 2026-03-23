@@ -1,16 +1,20 @@
 import re
 from dataclasses import dataclass
-from app.core.constants import (DEFAULT_AUTOLIMIT, MAX_LIMIT_ALLOWED, DatabaseDialect)
+
+from app.core.constants import (DEFAULT_AUTOLIMIT, MAX_LIMIT_ALLOWED,
+                                DatabaseDialect)
 from app.core.exceptions import PolicyViolationError
 from app.engine.contracts.validation_contract import ValidationOutput
-
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _SELECT_RE = re.compile(r"^\s*SELECT\b", re.IGNORECASE)
 _LIMIT_RE = re.compile(r"\bLIMIT\s+(\d+)\b", re.IGNORECASE)
 _SELECT_STAR_RE = re.compile(r"\bSELECT\s+\*\b", re.IGNORECASE)
 _SQL_COMMENT_RE = re.compile(r"(--[^\n]*\n)|(/\*.*?\*/)", re.DOTALL)
-_FORBIDDEN_KEYWORDS = re.compile(r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|MERGE|CALL)\b", re.IGNORECASE)
+_FORBIDDEN_KEYWORDS = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|MERGE|CALL)\b",
+    re.IGNORECASE,
+)
 
 
 def _strip_comments(sql: str) -> str:
@@ -22,6 +26,7 @@ def _normalize_sql(sql: str) -> str:
     sql = sql.strip().rstrip(";")
     sql = re.sub(_WHITESPACE_RE, " ", sql)
     return sql
+
 
 @dataclass(frozen=True)
 class SqlPolicyEngine:

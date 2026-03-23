@@ -1,7 +1,9 @@
 import uuid
 from typing import Any, Optional
-from sqlalchemy import select, desc
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from app.database.metadata.models.schema_snapshot import SchemaSnapshotModel
 from app.database.metadata.session import get_async_session
 
@@ -16,14 +18,14 @@ class SnapshotManager:
     - Avoid runtime schema introspection
     """
 
-    def __init__(self, sessionmaker: Optional[async_sessionmaker[AsyncSession]] = None) -> None:
+    def __init__(
+        self, sessionmaker: Optional[async_sessionmaker[AsyncSession]] = None
+    ) -> None:
         self._cache: dict[str, dict[str, Any]] = {}
         self._Session = sessionmaker or get_async_session()
 
-
     def invalidate(self, data_source_id: str) -> None:
         self._cache.pop(data_source_id, None)
-
 
     async def get_snapshot(self, data_source_id: str) -> dict[str, Any]:
         if data_source_id in self._cache:
@@ -40,7 +42,9 @@ class SnapshotManager:
             row = result.scalar_one_or_none()
 
         if not row:
-            raise RuntimeError(f"No schema snapshot found for data_source_id={data_source_id}")
+            raise RuntimeError(
+                f"No schema snapshot found for data_source_id={data_source_id}"
+            )
 
         self._cache[data_source_id] = row.snapshot
 

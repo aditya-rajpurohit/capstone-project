@@ -16,7 +16,9 @@ class QueryCache:
         self._hits = 0
         self._misses = 0
 
-    def set(self, key: str, value: dict[str, Any], ttl_seconds: Optional[int] = None) -> None:
+    def set(
+        self, key: str, value: dict[str, Any], ttl_seconds: Optional[int] = None
+    ) -> None:
         ttl = ttl_seconds if ttl_seconds is not None else self.default_ttl
         self._store[key] = {
             "value": value,

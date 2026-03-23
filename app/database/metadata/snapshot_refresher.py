@@ -1,12 +1,11 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.metadata.models.schema_snapshot import SchemaSnapshotModel
 from app.database.registry.database_registry import DatabaseRegistry
-
 
 
 class SnapshotRefresher:
@@ -42,7 +41,7 @@ class SnapshotRefresher:
             )
         )
         await session.commit()
-        
+
         return new_version
 
     def _normalize(self, raw: Any) -> dict[str, Any]:
@@ -52,4 +51,6 @@ class SnapshotRefresher:
         """
         if isinstance(raw, dict) and "tables" in raw:
             return raw
-        raise RuntimeError("ERROR: Connector introspection must return {'tables': [...]} canonical snapshot.")
+        raise RuntimeError(
+            "ERROR: Connector introspection must return {'tables': [...]} canonical snapshot."
+        )

@@ -5,9 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import DatabaseDialect
+from app.database.connectors.base_connector import BaseConnector
+from app.database.connectors.mongodb_connector import MongoDBConnector
+from app.database.connectors.mysql_connector import MySQLConnector
+from app.database.connectors.postgres_connector import PostgresConnector
+from app.database.connectors.sqlite_connector import SQLiteConnector
 from app.database.metadata.models.data_source import DataSourceConfigModel
-from app.database.connector.base_connector import BaseConnector
-from app.database.connector.postgres_connector import PostgresConnector
 
 
 @dataclass
@@ -45,10 +48,7 @@ class DatabaseRegistry:
         return list(self._handles.values())
 
     def list_healthy(self) -> list[DataSourceHandle]:
-        return [
-            h for h in self._handles.values()
-            if h.is_active and h.is_healthy
-        ]
+        return [h for h in self._handles.values() if h.is_active and h.is_healthy]
 
     def mark_unhealthy(self, data_source_id: str) -> None:
         h = self._handles.get(data_source_id)
@@ -60,7 +60,9 @@ class DatabaseRegistry:
     # -----------------------------
 
     async def load_from_appdb(self, session: AsyncSession) -> None:
-        stmt = select(DataSourceConfigModel).where(DataSourceConfigModel.is_active.is_(True))
+        stmt = select(DataSourceConfigModel).where(
+            DataSourceConfigModel.is_active.is_(True)
+        )
         result = await session.execute(stmt)
         rows = result.scalars().all()
 
@@ -100,7 +102,9 @@ class DatabaseRegistry:
     # Connector Factory
     # -----------------------------
 
-    def _build_connector(self, row: DataSourceConfigModel, dialect: DatabaseDialect) -> BaseConnector:
+    def _build_connector(
+        self, row: DataSourceConfigModel, dialect: DatabaseDialect
+    ) -> BaseConnector:
         # TODO: replace this with proper decrypt from app/core/security
         password = row.encrypted_password or ""
         username = row.username or ""
@@ -108,5 +112,14 @@ class DatabaseRegistry:
         if dialect == DatabaseDialect.POSTGRES:
             dsn = f"postgresql://{username}:{password}@{row.host}:{row.port}/{row.database_name}"
             return PostgresConnector(dsn)
+
+        # if dialect == DatabaseDialect.MYSQL:
+        #     return MySQLConnector(dsn)
+
+        # if dialect == DatabaseDialect.SQLITE:
+        #     return SQLiteConnector(path)
+
+        # if dialect == DatabaseDialect.MONGODB:
+        #     return MongoDBConnector(uri, db_name)
 
         raise ValueError(f"Unsupported dialect: {dialect}")

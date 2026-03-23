@@ -1,9 +1,10 @@
 import asyncio
 import time
+
 from app.core.constants import DEFAULT_TIMEOUT_SECONDS
 from app.core.exceptions import DataSourceExecutionError
+from app.database.connectors.base_connector import BaseConnector
 from app.engine.contracts.execution_contract import ExecutionResult
-from app.database.connector.base_connector import BaseConnector
 
 
 class ExecutionEngine:

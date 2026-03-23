@@ -18,7 +18,9 @@ class Anthropic(Model):
             raise ValueError("Error: ANTHROPIC_API_KEY not assigned!")
         self.client = anthropic.AsyncAnthropic(api_key=_KEY)
 
-    async def generate(self, request: ModelRequest, schema: Type[BaseModel] | None = None) -> ModelResponse:
+    async def generate(
+        self, request: ModelRequest, schema: Type[BaseModel] | None = None
+    ) -> ModelResponse:
 
         response = await self.client.messages.create(
             model=request.model,

@@ -5,6 +5,7 @@ from app.engine.context.agent_context import AgentContext
 
 T = TypeVar("T")
 
+
 class BaseAgent(ABC, Generic[T]):
     """
     All intelligence agents:
@@ -14,5 +15,4 @@ class BaseAgent(ABC, Generic[T]):
     """
 
     @abstractmethod
-    async def run(self, context: AgentContext) -> T:
-        ...
+    async def run(self, context: AgentContext) -> T: ...

@@ -1,12 +1,13 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import JSON, DateTime, Index, String, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from app.database.metadata.models.base import Base
 
+from app.database.metadata.models.base import Base
 
 
 class EmbeddingRecord(Base):
@@ -52,6 +53,3 @@ class EmbeddingRecord(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-
-
-Index("ix_embeddings_index_embedding", EmbeddingRecord.index, EmbeddingRecord.embedding)

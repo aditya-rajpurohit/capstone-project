@@ -8,6 +8,7 @@ MAX_REFLECTION_RETRIES = 2
 DEFAULT_AUTOLIMIT = 100
 MAX_LIMIT_ALLOWED = 1000
 
+
 class EngineState(str, Enum):
     INIT = "INIT"
     PLAN = "PLAN"
@@ -25,3 +26,11 @@ class DatabaseDialect(str, Enum):
     SQLITE = "SQLITE"
     MSSQL = "MSSQL"
     MONGODB = "MONGODB"
+    DYNAMODB = "DYNAMODB"
+    NEO4J = "NEO4J"
+    REDIS = "REDIS"
+    CASSANDRA = "CASSANDRA"
+    SNOWFLAKE = "SNOWFLAKE"
+    BIGQUERY = "BIGQUERY"
+    CLICKHOUSE = "CLICKHOUSE"
+    DUCKDB = "DUCKDB"

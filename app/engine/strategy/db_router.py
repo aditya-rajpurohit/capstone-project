@@ -2,6 +2,7 @@ import re
 
 from app.database.registry.database_registry import DatabaseRegistry
 
+
 class DBRouter:
     """
     Deterministic MVP routing:
@@ -10,7 +11,9 @@ class DBRouter:
     """
 
     @staticmethod
-    def route(user_query: str, active_database_ids: list[str], registry: DatabaseRegistry) -> list[str]:
+    def route(
+        user_query: str, active_database_ids: list[str], registry: DatabaseRegistry
+    ) -> list[str]:
         q = user_query.lower()
         matched = []
 

@@ -69,7 +69,7 @@ class SchemaSelector:
         max_tables: int | None = None,
         max_cols_per_table: int | None = None,
         include_if_no_match: bool = True,
-        preferred_tables: Optional[list[Any]]
+        preferred_tables: Optional[list[Any]] = None
     ) -> dict[str, Any]:
         """
         Returns a reduced schema snapshot in the same shape: {"tables":[...]}.
@@ -78,7 +78,7 @@ class SchemaSelector:
           - If True and no tables match, return first N tables (bounded) to avoid empty schema.
           - If False and no tables match, return {"tables": []}.
         """
-        
+
         if not schema_snapshot or "tables" not in schema_snapshot:
             return {"tables": []}
 

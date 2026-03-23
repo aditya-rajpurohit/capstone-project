@@ -1,8 +1,10 @@
-import asyncpg
 from typing import Any
+
+import asyncpg
+
 from app.core.constants import DatabaseDialect
 from app.core.exceptions import DataSourceExecutionError
-from app.database.connector.base_connector import BaseConnector
+from app.database.connectors.base_connector import BaseConnector
 
 
 class PostgresConnector(BaseConnector):
@@ -13,7 +15,7 @@ class PostgresConnector(BaseConnector):
         self.dialect = DatabaseDialect.POSTGRES
 
     async def connect(self) -> None:
-        if not self._pool:
+        if self._pool is None:
             self._pool = await asyncpg.create_pool(dsn=self._dsn)
 
     async def close(self) -> None:
@@ -24,6 +26,7 @@ class PostgresConnector(BaseConnector):
     async def health_check(self) -> bool:
         if not self._pool:
             return False
+
         try:
             async with self._pool.acquire() as connection:
                 await connection.execute("SELECT 1")
@@ -32,33 +35,35 @@ class PostgresConnector(BaseConnector):
             return False
 
     async def execute(self, sql: str) -> list[dict[str, Any]]:
-        if not self._pool:
-            raise DataSourceExecutionError("Error: PostgresConnector not connected!")
-        
+        if self._pool is None:
+            raise DataSourceExecutionError("ERROR: PostgresConnector not connected!")
+
         try:
             async with self._pool.acquire() as connection:
                 rows = await connection.fetch(sql)
-                return [dict(row) for row in rows]
+                return [dict(r) for r in rows]
+
         except Exception as e:
             raise DataSourceExecutionError(str(e)) from e
 
     async def introspect_schema(self) -> dict[str, Any]:
-        if not self._pool:
-            raise DataSourceExecutionError("Error: PostgresConnector not connected!")
+        if self._pool is None:
+            raise DataSourceExecutionError("ERROR: PostgresConnector not connected!")
+
+        snapshot = {"tables": []}
 
         async with self._pool.acquire() as connection:
 
             tables = await connection.fetch("""
                 SELECT table_name
                 FROM information_schema.tables
-                WHERE table_schema = 'public'
-                AND table_type = 'BASE TABLE'
+                WHERE table_schema='public'
+                AND table_type='BASE TABLE'
             """)
 
-            snapshot: dict[str, Any] = {"tables": []}
-
             for table in tables:
-                table_name = table["table_name"]
+
+                name = table["table_name"]
 
                 columns = await connection.fetch(
                     """
@@ -66,7 +71,7 @@ class PostgresConnector(BaseConnector):
                     FROM information_schema.columns
                     WHERE table_name = $1
                     """,
-                    table_name,
+                    name,
                 )
 
                 foreign_keys = await connection.fetch(
@@ -80,15 +85,15 @@ class PostgresConnector(BaseConnector):
                         ON tc.constraint_name = kcu.constraint_name
                     JOIN information_schema.constraint_column_usage ccu
                         ON ccu.constraint_name = tc.constraint_name
-                    WHERE tc.constraint_type = 'FOREIGN KEY'
-                        AND tc.table_name = $1
+                    WHERE tc.constraint_type='FOREIGN KEY'
+                    AND tc.table_name = $1
                     """,
-                    table_name,
+                    name,
                 )
 
                 snapshot["tables"].append(
                     {
-                        "name": table_name,
+                        "name": name,
                         "columns": [
                             {
                                 "name": c["column_name"],
@@ -108,4 +113,4 @@ class PostgresConnector(BaseConnector):
                     }
                 )
 
-            return snapshot
+        return snapshot

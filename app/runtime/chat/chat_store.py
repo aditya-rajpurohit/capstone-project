@@ -2,7 +2,7 @@ from sqlalchemy import select
 
 from app.database.metadata.session import get_async_session
 from app.runtime.chat.chat_memory import ChatMemory
-from app.runtime.models import ChatSessionModel
+from app.runtime.chat_model import ChatSessionModel
 
 
 class ChatStore:
@@ -18,7 +18,7 @@ class ChatStore:
             if not row:
                 return mem
             mem.summary = row.summary
-            mem.turns = list(row.turns.get("turns", []))
+            mem.turns = list(row.turns or [])
             return mem
 
     async def save(self, mem: ChatMemory) -> None:
@@ -29,14 +29,15 @@ class ChatStore:
                     ChatSessionModel.session_id == mem.session_id
                 )
             )
-            payload = {"turns": mem.turns}
             if not row:
                 session.add(
                     ChatSessionModel(
-                        session_id=mem.session_id, summary=mem.summary, turns=payload
+                        session_id=mem.session_id,
+                        summary=mem.summary,
+                        turns=mem.turns,
                     )
                 )
             else:
                 row.summary = mem.summary
-                row.turns = payload
+                row.turns = mem.turns
             await session.commit()

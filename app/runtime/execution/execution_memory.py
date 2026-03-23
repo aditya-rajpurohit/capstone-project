@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
+
 from app.core.constants import EngineState
 from app.retrieval.retrieval_types import RetrievalHit
 
@@ -88,7 +89,7 @@ class ExecutionMemory:
 
     def total_retry_count(self) -> int:
         return sum(ctx.get("retry_count", 0) for ctx in self.per_db_context.values())
-    
+
     def set_db_error(self, db_id: str, message: str) -> None:
         self.per_db_context.setdefault(db_id, {})
         self.per_db_context[db_id]["last_error_message"] = message
