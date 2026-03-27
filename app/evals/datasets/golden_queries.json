@@ -1,0 +1,17 @@
+[
+  {
+    "query": "Show all users",
+    "expected_sql_contains": "users",
+    "db": "postgres"
+  },
+  {
+    "query": "List user names",
+    "expected_sql_contains": "name",
+    "db": "postgres"
+  },
+  {
+    "query": "How many users exist",
+    "expected_sql_contains": "count",
+    "db": "postgres"
+  }
+]

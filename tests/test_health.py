@@ -5,7 +5,7 @@ from app.main import app
 
 
 @pytest.mark.asyncio
-async def test_health():
+async def test_app_health():
     transport = ASGITransport(app=app)
 
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
