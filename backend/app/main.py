@@ -12,10 +12,6 @@ from app.database.registry.database_registry import DatabaseRegistry
 app = FastAPI(title="Capstone Project")
 
 
-@app.get("/")
-async def root():
-    return {"status": "running"}
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
