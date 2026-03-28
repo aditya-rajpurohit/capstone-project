@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-pydantic
+pydantic[email]
+# pydantic
 sqlalchemy
 asyncpg
 psycopg2-binary
@@ -9,6 +10,8 @@ python-dotenv
 structlog
 sqlglot
 cryptography
+python-jose[cryptography]
+passlib[bcrypt]
 pytest
 pytest-env
 pytest-asyncio
