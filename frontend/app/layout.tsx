@@ -31,15 +31,14 @@
 //   );
 // }
 
-                
 import "./globals.css";
-import Navbar from "@/app/components/Navbar"
+import NavbarWrapper from "@/app/components/NavbarWrapper";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <Navbar />
+        <NavbarWrapper />
         {children}
       </body>
     </html>

@@ -1,15 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from app.api.dependencies import get_current_user, get_query_service, get_session_service, get_streaming_service
-from app.api.schemas.conversation_schemas import (
-    ConversationResponse,
-    CreateConversationRequest,
-    CreateMessageRequest,
-    ListConversationsResponse,
-    ListMessagesResponse,
-    MessageResponse,
-)
+from app.api.dependencies import (get_current_user, get_query_service,
+                                  get_session_service, get_streaming_service)
+from app.api.schemas.conversation_schemas import (ConversationResponse,
+                                                  CreateConversationRequest,
+                                                  CreateMessageRequest,
+                                                  ListConversationsResponse,
+                                                  ListMessagesResponse,
+                                                  MessageResponse)
 from app.api.utils.responses import success_response
 
 router = APIRouter(prefix="/v1/conversations", tags=["conversations"])
@@ -75,8 +74,7 @@ async def list_conversations(
     return success_response(
         data={
             "conversations": [
-                _conversation_to_dict(conversation)
-                for conversation in conversations
+                _conversation_to_dict(conversation) for conversation in conversations
             ]
         },
         trace_id=getattr(request.state, "trace_id", None),

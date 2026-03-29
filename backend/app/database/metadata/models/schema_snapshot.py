@@ -14,6 +14,7 @@ class SchemaSnapshotModel(Base):
     Stores versioned normalized schema snapshots for a data source.
     Layer 1 requirement: use snapshot instead of runtime introspection.
     """
+
     __tablename__ = "schema_snapshots"
     __table_args__ = (
         UniqueConstraint(

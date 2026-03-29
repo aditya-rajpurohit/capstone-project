@@ -20,3 +20,11 @@ def get_async_session():
         )
 
     return _sessionmaker
+
+
+async def get_db_session():
+
+    sessionmaker = get_async_session()
+
+    async with sessionmaker() as session:
+        yield session

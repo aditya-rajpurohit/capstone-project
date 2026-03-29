@@ -24,7 +24,9 @@ class GlobalErrorHandlerMiddleware(BaseHTTPMiddleware):
                 recoverable=400 <= exc.status_code < 500,
                 timestamp=getattr(request.state, "request_timestamp", None),
             )
-            return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+            return JSONResponse(
+                status_code=exc.status_code, content=payload.model_dump()
+            )
 
         except ValidationError:
             payload = error_response(
@@ -49,7 +51,7 @@ class GlobalErrorHandlerMiddleware(BaseHTTPMiddleware):
         except Exception:
             payload = error_response(
                 error_code="INTERNAL_SERVER_ERROR",
-                message="An internal error occurred.",
+                message=f"An internal error occurred.",
                 trace_id=getattr(request.state, "trace_id", None),
                 recoverable=False,
                 timestamp=getattr(request.state, "request_timestamp", None),
