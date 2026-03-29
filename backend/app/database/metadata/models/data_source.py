@@ -14,6 +14,7 @@ class DataSourceConfigModel(Base):
     Persistent configuration for a registered data source.
     Represents one DB server + credentials.
     """
+
     __tablename__ = "data_sources"
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

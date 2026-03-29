@@ -1,10 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.dependencies import get_current_user, get_datasource_service
-from app.api.schemas.datasource_schemas import (
-    DatasourceResponse,
-    RegisterDatasourceRequest,
-)
+from app.api.schemas.datasource_schemas import (DatasourceResponse,
+                                                RegisterDatasourceRequest)
 from app.api.utils.responses import success_response
 
 router = APIRouter(prefix="/v1/datasources", tags=["datasources"])

@@ -1,10 +1,10 @@
 import uuid
 from typing import Any
 
+from app.api.services.session_service import SessionService
 from app.engine.context.chat_context import ChatContext
 from app.engine.orchestration.execution_controller import ExecutionController
 from app.runtime.chat.chat_memory import ChatMemory
-from app.api.services.session_service import SessionService
 
 
 class QueryService:

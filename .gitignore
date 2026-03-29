@@ -12,6 +12,7 @@ node_modules/
 .next/
 out/
 build/
+.cache/
 
 # Debug / logs
 npm-debug.log*
@@ -55,3 +56,6 @@ Thumbs.db
 # Local dev / data
 postgres_data/
 *.sqlite3
+
+*.log
+.python-version

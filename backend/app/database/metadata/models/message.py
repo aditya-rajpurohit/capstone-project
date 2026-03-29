@@ -1,4 +1,3 @@
-
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -12,7 +11,9 @@ from app.database.metadata.models.base import Base
 
 class MessageModel(Base):
     __tablename__ = "messages"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("conversations.id", ondelete="CASCADE"),
